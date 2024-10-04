@@ -1,5 +1,6 @@
 # ConstellationManagement
 Analysis and Optimization of Mega-constellation spare management strategy.
+
 Markov Chain is used for analysis and the Genetic Algorithm is employed for the optimization with the analysis method.
 
 ## Directory Description
@@ -11,5 +12,6 @@ Markov Chain is used for analysis and the Genetic Algorithm is employed for the 
 
 ## Dependencies
 Statistics and Machine Learning Toolbox™ is needed for some basic validation scripts.
+
 The main scripts do not require the toolbox.
 
