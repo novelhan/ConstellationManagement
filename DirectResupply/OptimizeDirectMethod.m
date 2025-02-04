@@ -2,6 +2,7 @@
 % The decision variables to optimize are (r,q) of the inventory control
 % The cost function is the effective operational cost of the strategy per unit cycle
 % The constraints include the payload capacity of LV, resilience of the spare strategy
+% The script requires optimization toolbox.
 
 clear all
 close all

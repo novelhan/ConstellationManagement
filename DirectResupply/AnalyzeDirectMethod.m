@@ -14,31 +14,31 @@ addpath([libdir, 'CommonSource'])
 %% Test Param
 %.. Sim time
 dt_sim = 1; % [day]
-time_sim = 0:dt_sim:365*1000;
+time_sim = 0:dt_sim:365*5000;
 
 %.. Marcov Chain Period
 dt_mc = dt_sim;  % [day]
 
 %.. Failure rate
-p_fail = 0.15/365; % [#/day] 0.05, 0.1, 0.15
+p_fail = 0.25/365; % [#/day] 0.05, 0.1, 0.15
 p_sim = p_fail * dt_sim; % [#/dt_sim]
 p_mc = p_fail * dt_mc; % [#/dt_mc]
 
 %.. Failure type
-p_type = 0; % 0:Constant failure, 1:State Dependent failure
+p_type = 1; % 0:Constant failure, 1:State Dependent failure
 n_sat = 40; % Number of operating satellite per orbit for nominal condition
 
 %.. Direct (Q,R) Policy Parameter
 Q = 4;
-R = 42;
+R = 40;
 
 %.. State Parameter p.7
 Xmax = Q + R; % Max State Level: bar(N_sat) 
 Xnum = 0:1:Xmax; % State Counts: 0,1,...,bar(N_sat)
 
 %.. Direct LV Parameters
-mu_LV   =   60; % Mean lead time [day]
-T0_LV   =   30; % Constant shift lead time [day]
+mu_LV   =   40; % Mean lead time [day]
+T0_LV   =   20; % Constant shift lead time [day]
 dTlv_max = ceil((T0_LV + mu_LV + 5*mu_LV)/dt_mc); % Max Lead Time Bin (mean + 5*sigma) [dt_sim]
 
 %% Direct (Q,R) Policy 
@@ -71,12 +71,12 @@ for i = 1:iter_max
     for k = 1:length(time_sim)
         %%% 1. Generate Fail Sample at Every Contact
         if p_type == 0 %.. Const Failure Rate
-            N_fail = poissrnd(n_sat*p_sim, 1);
+            N_fail = CustomPoisRnd(n_sat*p_sim, 1);
         else %.. State Dependant Failure Rate
             if Non_k > n_sat
-                N_fail = poissrnd(n_sat*p_sim, 1);
+                N_fail = CustomPoisRnd(n_sat*p_sim, 1);
             else
-                N_fail = poissrnd(Non_k*p_sim, 1);
+                N_fail = CustomPoisRnd(Non_k*p_sim, 1);
             end
         end
         
@@ -99,7 +99,7 @@ for i = 1:iter_max
         %%% 3. Check Reorder at Every Time Step
         if cnt_lv == -1 && Non_k <= R % Reorder if not ordered and N <= R
             % Sample Lead Time and Save
-            dT_LV = T0_LV + exprnd(mu_LV,1);
+            dT_LV = T0_LV + CustomExpRnd(mu_LV,1);
             dT_LV = ceil(dT_LV/dt_sim);
             if dTlv_max < dT_LV
                 Xlv(end,i) = Xlv(end,i) + 1;
