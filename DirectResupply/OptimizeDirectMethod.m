@@ -2,11 +2,17 @@
 % The decision variables to optimize are (r,q) of the inventory control
 % The cost function is the effective operational cost of the strategy per unit cycle
 % The constraints include the payload capacity of LV, resilience of the spare strategy
-% The script requires optimization toolbox.
+% (!!!!) The script requires optimization toolbox.
 
 clear all
 close all
 clc
+
+%.. PATH
+mfilepath = pwd;
+idcs = strfind(mfilepath,'\');
+libdir = mfilepath(1:idcs(end));
+addpath([libdir, 'CommonSource'])
 
 %% System Parameter
 %.. Marcov Chain Period
@@ -100,8 +106,8 @@ legend([h1 h2 h3], 'Infeasible', 'Feasible', 'Optimal')
 function J = CostFun(x,PARA)
     Qdr = x(1);
     Rdr = x(2);
-    [xx, PI, T] = ExactDirectProb(PARA.f, PARA.f_type, Qdr,Rdr,...
-                                  PARA.mu_LV, PARA.dt_mc, PARA.T0_LV, PARA.n_sat);
+    [xx, PI, T] = ExactDirectEventBased(PARA.f, PARA.f_type, Qdr,Rdr,...
+                                        PARA.mu_LV, PARA.dt_mc, PARA.T0_LV, PARA.n_sat);
     
     %.. Cost for making spare satellites per unit time
     J_build = PARA.c_build * Qdr / T.T_dr;
@@ -124,8 +130,8 @@ end
 function [c,ceq] = ConstFun(x,PARA)
     Qdr = x(1);
     Rdr = x(2);
-    [xx, PI, ~] = ExactDirectProb(PARA.f, PARA.f_type, Qdr,Rdr,...
-                                  PARA.mu_LV, PARA.dt_mc, PARA.T0_LV, PARA.n_sat);
+    [xx, PI, ~] = ExactDirectEventBased(PARA.f, PARA.f_type, Qdr,Rdr,...
+                                        PARA.mu_LV, PARA.dt_mc, PARA.T0_LV, PARA.n_sat);
     
     idx = find(xx == PARA.n_sat);
     p_loss = sum(PI.pi_dr(idx+1:end));

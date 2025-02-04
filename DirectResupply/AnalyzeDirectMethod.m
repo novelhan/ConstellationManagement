@@ -167,8 +167,7 @@ ylabel('Probability')
 % As dt -> 0, pi_r becomes [0 0... 0 1 0... 0] 1 at N=R
 f = p_mc;
 lam = 1/mu_LV;
-[xx, PI, T] = ExactDirectProb(p_fail,p_type,Q,R,lam,dt_mc,T0_LV,n_sat);
-
+[xx, PI, T] = ExactDirectEventBased(p_fail,p_type,Q,R,lam,dt_mc,T0_LV,n_sat);
 
 figure(2); hold on
 plot(xx(1:13), PI.pi_dr(1:13), 'r*')

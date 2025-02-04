@@ -4,6 +4,12 @@ close all
 clear all
 clc
 
+%.. PATH
+mfilepath = pwd;
+idcs = strfind(mfilepath,'\');
+libdir = mfilepath(1:idcs(end));
+addpath([libdir, 'CommonSource'])
+
 state = 0; % 0: hot, 1: cold
 iter_max = 1000; % # of iteration
 Xset = zeros(iter_max,1); % Var. for saving
