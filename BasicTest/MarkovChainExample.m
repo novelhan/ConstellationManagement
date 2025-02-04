@@ -46,7 +46,7 @@ pi_anl2 = limitdist(P'); % Row vector form is used
 [pi_sim, pi_anl1, pi_anl2]
 
 %% Test Large Matrix
-n = 500;
+n = 50;
 P = rand(n,n);
 for i = 1:n
     P(:,i) = P(:,i)/sum(P(:,i));
@@ -55,12 +55,12 @@ end
 iter_max = 100;
 tic
 for i = 1:iter_max
-    x0 = limitdist(P');
+    x0 = limitdist(P',2);
 end
 T0 = toc
 
 tic
 for i = 1:iter_max
-    x1 = limitdist1(P);
+    x1 = limitdist(P);
 end
 T1 = toc
