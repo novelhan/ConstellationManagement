@@ -14,7 +14,7 @@ addpath([libdir, 'CommonSource'])
 %% Test Param
 %.. Sim time
 dt_sim = 1; % [day]
-time_sim = 0:dt_sim:365*5000;
+time_sim = 0:dt_sim:365*15000;
 
 %.. Marcov Chain Period
 dt_mc = dt_sim;  % [day]
@@ -167,40 +167,79 @@ ylabel('Probability')
 % As dt -> 0, pi_r becomes [0 0... 0 1 0... 0] 1 at N=R
 f = p_mc;
 lam = 1/mu_LV;
-[xx, PI, T] = ExactDirectEventBased(p_fail,p_type,Q,R,lam,dt_mc,T0_LV,n_sat);
+
+%.. Method 1
+tic
+for i = 1:100
+[xx, PI1, T1] = ExactDirectEventBased(p_fail,p_type,Q,R,lam,dt_mc,T0_LV,n_sat);
+end
+toc 
 
 figure(2); hold on
-plot(xx(1:13), PI.pi_dr(1:13), 'r*')
+plot(xx(1:13), PI1.pi_dr(1:13), 'r*')
 xlim([xx(13)-0.5, xx(1)+0.5])
-legend('Sim.', 'Sol.', 'location', 'best')
 
 figure(3); hold on
-plot(xx(1:13), PI.pi_q(1:13), 'r*')
+plot(xx(1:13), PI1.pi_q(1:13), 'r*')
 xlim([xx(13)-0.5, xx(1)+0.5])
-legend('Sim.', 'Sol.', 'location', 'best')
 
 figure(4); hold on
-plot(xx(1:13), PI.pi_r(1:13), 'r*')
+plot(xx(1:13), PI1.pi_r(1:13), 'r*')
 xlim([xx(13)-0.5, xx(1)+0.5])
-legend('Sim.', 'Sol.', 'location', 'best')
 
 figure(5); hold on
-plot(xx(1:13), PI.pi_np(1:13), 'r*')
+plot(xx(1:13), PI1.pi_np(1:13), 'r*')
 xlim([xx(13)-0.5, xx(1)+0.5])
-legend('Sim.', 'Sol.', 'location', 'best')
 
 figure(6); hold on
-plot(xx(1:13), PI.pi_wp(1:13), 'r*')
+plot(xx(1:13), PI1.pi_wp(1:13), 'r*')
 xlim([xx(13)-0.5, xx(1)+0.5])
-legend('Sim.', 'Sol.', 'location', 'best')
+
+%.. Method 2
+tic
+for i = 1:100
+[xx, PI2, T2] = ExactDirectRatioBased(p_fail,p_type,Q,R,lam,dt_mc,T0_LV,n_sat);
+end
+toc
+
+figure(2); hold on
+plot(xx(1:13), PI2.pi_dr(1:13), 'go')
+xlim([xx(13)-0.5, xx(1)+0.5])
+legend('Sim.', 'Sol.1', 'Sol.2', 'location', 'best')
+
+figure(3); hold on
+plot(xx(1:13), PI2.pi_q(1:13), 'go')
+xlim([xx(13)-0.5, xx(1)+0.5])
+legend('Sim.', 'Sol.1', 'Sol.2', 'location', 'best')
+
+figure(4); hold on
+plot(xx(1:13), PI2.pi_r(1:13), 'go')
+xlim([xx(13)-0.5, xx(1)+0.5])
+legend('Sim.', 'Sol.1', 'Sol.2', 'location', 'best')
+
+figure(5); hold on
+plot(xx(1:13), PI2.pi_np(1:13), 'go')
+xlim([xx(13)-0.5, xx(1)+0.5])
+legend('Sim.', 'Sol.1', 'Sol.2', 'location', 'best')
+
+figure(6); hold on
+plot(xx(1:13), PI2.pi_wp(1:13), 'go')
+xlim([xx(13)-0.5, xx(1)+0.5])
+legend('Sim.', 'Sol.1', 'Sol.2', 'location', 'best')
+
 
 dtxx = T0_LV+1:dTlv_max;
 figure(7); hold on
 plot(dtxx, exp(-(dtxx - T0_LV - 1)/mu_LV)*(1-exp(-dt_mc/mu_LV)), 'r*')
 
+
+
+
 %.. Given state distribution Compute Mean, ...
-n_avg = sum(xx.*PI.pi_dr);
+n_avg = sum(xx.*PI1.pi_dr);
 idx = find(xx == n_sat);
-rho_loss = sum(PI.pi_dr(idx+1:end));
-n_spare = sum((xx(1:idx-1)-n_sat).*PI.pi_dr(1:idx-1));
+rho_loss = sum(PI1.pi_dr(idx+1:end));
+n_spare = sum((xx(1:idx-1)-n_sat).*PI1.pi_dr(1:idx-1));
+
+
 
