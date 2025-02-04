@@ -20,7 +20,7 @@
 % Analysis and Design of Satellite Constellation Spare Strategy Using Markov Chain
 % https://doi.org/10.48550/arXiv.2408.09250
 
-function [x, PI, T] = ExactDirectProb(f, f_type, Q, R, mu, dt_mc, dt_lv, n_sat)
+function [x, PI, T] = ExactDirectEventBased(f, f_type, Q, R, mu, dt_mc, dt_lv, n_sat)
     %%% Step 1: Initialize the parameters
     %.. State
     xmax = Q + R; % Max State Level: bar(N_sat), p7
