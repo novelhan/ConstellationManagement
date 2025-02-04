@@ -41,7 +41,7 @@ pi_anl1 = V(:,2)/sum(V(:,2));
 
 % Long term behavior: state space reduction
 P100 = P^100;
-pi_anl2 = limitdist(P'); % Row vector form is used
+pi_anl2 = limitdist(P); % Row vector form is used
 
 [pi_sim, pi_anl1, pi_anl2]
 
@@ -55,12 +55,12 @@ end
 iter_max = 100;
 tic
 for i = 1:iter_max
-    x0 = limitdist(P',2);
+    x0 = limitdist(P,2); % State-space reduction method
 end
 T0 = toc
 
 tic
 for i = 1:iter_max
-    x1 = limitdist(P);
+    x1 = limitdist(P); % Built-in linear solver
 end
 T1 = toc

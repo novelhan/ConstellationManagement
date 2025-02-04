@@ -12,6 +12,7 @@ if method == 2
     % chain or the generator matrix Q.
     % https://www.math.wustl.edu/~feres/Math450Lect04.pdf
     
+    P = P'; % This code assumes the row vector notation.
     [ns, ~]=size(P);
     n=ns;
     p=zeros(n);
