@@ -19,20 +19,29 @@
 % Analysis and Design of Satellite Constellation Spare Strategy Using Markov Chain
 % https://doi.org/10.48550/arXiv.2408.09250
 
+
 function [PI_i, PI_p, T_i, T_p, err] = ExactInDirectProb(iter_max, ParaInPlane, ParaParking)
     %.. Assume Perfect Availability for initialization
     nx_i = ParaInPlane.Q + ParaInPlane.R + 1;
     Pdav = 0.9*ones(1,nx_i);
-    PI_i = ExactInDirectPlane(Pdav, ParaInPlane);
-    PI_p = ExactInDirectPark(PI_i.pi_dmd, ParaParking);
-    
+    [~, PI_i] = ExactInDirectPlane(ParaInPlane.f_sim, ParaInPlane.f_type, ParaInPlane.n_sat, Pdav,...
+                                   ParaInPlane.Q, ParaInPlane.R, ParaInPlane.dt_mc, ParaInPlane.dt_plane);
+%     [~, PI_p] = ExactInDirectParkTime(PI_i.pi_dmd, ParaParking.Q, ParaParking.R, ParaParking.dt_mc, ...
+%                                       ParaParking.dt_park, ParaParking.mu_lv, ParaParking.dt_lv);
+    [~, PI_p] = ExactInDirectParkRatio(PI_i.pi_dmd, ParaParking.Q, ParaParking.R, ParaParking.dt_mc, ...
+                                       ParaParking.dt_park, ParaParking.mu_lv, ParaParking.dt_lv);
+
     %.. Fixed Point Root Finding
     xx_pre = [PI_i.pi_ir; PI_p.pi_ir];
     err = zeros(1,iter_max);
     for iter = 1:iter_max
         %.. Update the solution
-        [PI_i, T_i] = ExactInDirectPlane(PI_p.Pdav, ParaInPlane);
-        [PI_p, T_p] = ExactInDirectPark(PI_i.pi_dmd, ParaParking);
+        [~, PI_i, T_i] = ExactInDirectPlane(ParaInPlane.f_sim, ParaInPlane.f_type, ParaInPlane.n_sat, PI_p.Pdav,...
+                                            ParaInPlane.Q, ParaInPlane.R, ParaInPlane.dt_mc, ParaInPlane.dt_plane);
+%         [~, PI_p, T_p] = ExactInDirectParkTime(PI_i.pi_dmd, ParaParking.Q, ParaParking.R, ParaParking.dt_mc, ...
+%                                                ParaParking.dt_park, ParaParking.mu_lv, ParaParking.dt_lv);
+        [~, PI_p, T_p] = ExactInDirectParkRatio(PI_i.pi_dmd, ParaParking.Q, ParaParking.R, ParaParking.dt_mc, ...
+                                                ParaParking.dt_park, ParaParking.mu_lv, ParaParking.dt_lv);
         
         %.. Check Convergence
         xx = [PI_i.pi_ir; PI_p.pi_ir];
@@ -48,252 +57,248 @@ function [PI_i, PI_p, T_i, T_p, err] = ExactInDirectProb(iter_max, ParaInPlane, 
     end
 end
 
+
+% function [PI_i, PI_p, T_i, T_p, err] = ExactInDirectProb(iter_max, ParaInPlane, ParaParking)
+%     %.. Assume Perfect Availability for initialization
+%     nx_i = ParaInPlane.Q + ParaInPlane.R + 1;
+%     Pdav = 0.9*ones(1,nx_i);
+%     PI_i = ExactInDirectPlane(Pdav, ParaInPlane);
+%     PI_p = ExactInDirectPark(PI_i.pi_dmd, ParaParking);
+% 
+%     %.. Fixed Point Root Finding
+%     xx_pre = [PI_i.pi_ir; PI_p.pi_ir];
+%     err = zeros(1,iter_max);
+%     for iter = 1:iter_max
+%         %.. Update the solution
+%         [PI_i, T_i] = ExactInDirectPlane(PI_p.Pdav, ParaInPlane);
+%         [PI_p, T_p] = ExactInDirectPark(PI_i.pi_dmd, ParaParking);
+% 
+%         %.. Check Convergence
+%         xx = [PI_i.pi_ir; PI_p.pi_ir];
+%         err(iter) = norm(xx - xx_pre);
+%         disp(['Iteration:', num2str(iter), ',  Error:', num2str(err(iter))])
+%         if err(iter) < 10^(-5)
+%             err = err(1:iter);
+%             PI_p.Pdav
+%             break;
+%         else
+%             xx_pre = xx;
+%         end
+%     end
+% end
+
 %% In-Plane Analysis
-function [PI, T] = ExactInDirectPlane(Pavd, Para)
-    %%% Step 1: Initialize the parameters
-    %.. Parameter
-    Q = Para.Q;
-    R = Para.R;
-    dt_mc = Para.dt_mc;
-    dt_plane = Para.dt_plane;
-    n_sat = Para.n_sat;
-
-    %.. State
-    xmax = Q + R; % Max State Level: bar(N_sat), p.10
-    x = (xmax:-1:0)';
-    nx = length(x); % Dimension of state distribution: bar(N_sat)+1
-    m = ceil(nx/Q); % This variable is needed only for implementation of the code
-    
-    %.. Constant reorder period
-    k_i = round(dt_plane/dt_mc); % Eq.32
-    
-    %%% Step 2: Compute pi_q and pi_r
-    %.. Failure Transition Matrix (Prq), Eqs.11~12
-    f = Para.f_sim*dt_mc; % Failure rate per unit time step
-    I = eye(nx);
-    Pf = zeros(nx);
-    for i = 1:nx
-        if Para.f_type == 0 
-            % Constant Failure Rate
-            Pf(i:end,i) = poisspdf(0:nx-i, n_sat*f)';        
-
-        else                
-            % Stock Level Dependant Failure Rate
-            if (nx-i) > n_sat
-                Pf(i:end,i) = poisspdf(0:nx-i, n_sat*f)';        
-            else
-                Pf(i:end,i) = poisspdf(0:nx-i, (nx-i)*f)';  
-            end
-        end
-        Pf(end,i) = 1 - sum(Pf(1:end-1, i));
-    end
-    Prq = Pf^k_i; % Eq.33
-
-    %.. Resupply Transition Matrix (Pqr), Eq. 36
-    Pq = zeros(m*Q);
-    for i = 1:m % row
-        for j = i:m % column
-            x_idx = (Q*(i-1) + 1):(Q*i);
-            y_idx = (Q*(j-1) + 1):(Q*j);
-            
-            %.. Prob
-            if i == 1
-                % Only single kappa
-                p_ij = Pavd(j);
-            else
-                % Kappa_i - Kappa_i+1
-                i0 = j-i+1;
-                p_ij = Pavd(i0) - Pavd(i0 + 1);
-            end
-            
-            Pq(x_idx,y_idx) = p_ij*eye(Q);
-        end
-    end
-    Pqr = Pq(1:nx,1:nx);
-
-    %.. Full Transition
-    Pqq = Pqr*Prq;
-        
-    %.. Conditional Dist. Eq.37
-    pi_q = limitdist(Pqq'); % Prob. Dist right before RAAN Contact
-    pi_r = Prq*pi_q; % Prob. Dist right after RAAN Contact
-    
-    %%% Step 3: Compute pi_ir
-    %.. Demand Distributio, Eq.39
-    pi_bf = zeros(m*Q,1);
-    pi_bf(1:nx) = pi_r;
-    pi_dmd = (sum(reshape(pi_bf,Q,m)))';
-
-    %.. Weighted Dist. Eq.38
-    Pir = I;
-    for i = 1:k_i-1
-        Pir = Pir + Pf^i;
-    end
-    Pir = Pir/k_i;
-    pi_ir = Pir*pi_q;
-
-    %.. Output
-    PI.pi_ir = pi_ir;
-    PI.pi_q = pi_q;
-    PI.pi_r = pi_r;
-    PI.pi_dmd = pi_dmd;
-    
-    T.T_ir = k_i*dt_mc; % T_ir = T_plane = k*dt_mc
-end
+% function [PI, T] = ExactInDirectPlane(Pavd, Para)
+%     %%% Step 1: Initialize the parameters
+%     %.. Parameter
+%     Q = Para.Q;
+%     R = Para.R;
+%     dt_mc = Para.dt_mc;
+%     dt_plane = Para.dt_plane;
+%     n_sat = Para.n_sat;
+% 
+%     %.. State
+%     xmax = Q + R; % Max State Level: bar(N_sat), p.10
+%     x = (xmax:-1:0)';
+%     nx = length(x); % Dimension of state distribution: bar(N_sat)+1
+%     m = ceil(nx/Q); % This variable is needed only for implementation of the code
+% 
+%     %.. Constant reorder period
+%     k_i = round(dt_plane/dt_mc); % Eq.32
+% 
+%     %%% Step 2: Compute pi_q and pi_r
+%     %.. Failure Transition Matrix (Prq), Eqs.11~12
+%     f = Para.f_sim*dt_mc; % Failure rate per unit time step
+%     I = eye(nx);
+%     Pf = zeros(nx);
+%     for i = 1:nx
+%         if Para.f_type == 0 
+%             % Constant Failure Rate
+%             Pf(i:end,i) = poisspdf(0:nx-i, n_sat*f)';        
+% 
+%         else                
+%             % Stock Level Dependant Failure Rate
+%             if (nx-i) > n_sat
+%                 Pf(i:end,i) = poisspdf(0:nx-i, n_sat*f)';        
+%             else
+%                 Pf(i:end,i) = poisspdf(0:nx-i, (nx-i)*f)';  
+%             end
+%         end
+%         Pf(end,i) = 1 - sum(Pf(1:end-1, i));
+%     end
+%     Prq = Pf^k_i; % Eq.33
+% 
+%     %.. Resupply Transition Matrix (Pqr), Eq. 36
+%     Pq = zeros(m*Q);
+%     for i = 1:m % row
+%         for j = i:m % column
+%             x_idx = (Q*(i-1) + 1):(Q*i);
+%             y_idx = (Q*(j-1) + 1):(Q*j);
+% 
+%             %.. Prob
+%             if i == 1
+%                 % Only single kappa
+%                 p_ij = Pavd(j);
+%             else
+%                 % Kappa_i - Kappa_i+1
+%                 i0 = j-i+1;
+%                 p_ij = Pavd(i0) - Pavd(i0 + 1);
+%             end
+% 
+%             Pq(x_idx,y_idx) = p_ij*eye(Q);
+%         end
+%     end
+%     Pqr = Pq(1:nx,1:nx);
+% 
+%     %.. Full Transition
+%     Pqq = Pqr*Prq;
+% 
+%     %.. Conditional Dist. Eq.37
+%     pi_q = limitdist(Pqq); % Prob. Dist right before RAAN Contact
+%     pi_r = Prq*pi_q; % Prob. Dist right after RAAN Contact
+% 
+%     %%% Step 3: Compute pi_ir
+%     %.. Demand Distributio, Eq.39
+%     pi_bf = zeros(m*Q,1);
+%     pi_bf(1:nx) = pi_r;
+%     pi_dmd = (sum(reshape(pi_bf,Q,m)))';
+% 
+%     %.. Weighted Dist. Eq.38
+%     Pir = I;
+%     for i = 1:k_i-1
+%         Pir = Pir + Pf^i;
+%     end
+%     Pir = Pir/k_i;
+%     pi_ir = Pir*pi_q;
+% 
+%     %.. Output
+%     PI.pi_ir = pi_ir;
+%     PI.pi_q = pi_q;
+%     PI.pi_r = pi_r;
+%     PI.pi_dmd = pi_dmd;
+% 
+%     T.T_ir = k_i*dt_mc; % T_ir = T_plane = k*dt_mc
+% end
 
 %% Parking-Plane Analysis
-function [PI, T] = ExactInDirectPark(Pdmd, Para)
-    %%% Step 1: Initialize the parameters
-    %.. Parameter
-    Q = Para.Q;
-    R = Para.R;
-    dt_mc = Para.dt_mc;
-    dt_park = Para.dt_park;
-    dt_lv = Para.dt_lv;
-
-    %.. State
-    xmax = Q + R; % Max State Level: bar(N_sat), p.10
-    x = (xmax:-1:0)';
-    nx = length(x); % Dimension of state distribution: bar(N_sat)+1
-    
-    %.. Step Count
-    k_p = round(dt_park/dt_mc); % Eq.40
-    c_lv = round(dt_lv/dt_mc);
-
-    %.. Constant lead time and residual
-    mu = 1/Para.mu_lv; % mu = 1/(mean)
-    m_p = floor(dt_lv/dt_park); % Eq.43
-    c_a = c_lv - m_p*k_p; % c_a = T_lp/T_mc, Eq.43
-    c_b = (m_p+1)*k_p - c_lv; % c_b = T_rp/T_mc, Eq.43
-
-    %%% Step 2: Compute pi_q and pi_r
-    %.. Failure Transition Matrix
-    I = eye(nx);
-    Pf = zeros(nx);
-    eta = zeros(nx,1);
-    eta(1:length(Pdmd)) = Pdmd;
-    eta = eta/sum(eta);
-    for i = 1:nx
-        Pf(i:end,i) = eta(1:nx-i+1)';
-        Pf(end,i) = 1 - sum(Pf(1:end-1, i));
-    end
-
-    %.. Resupply Transition Matrix, Eq.18
-    Pq = [ [eye(Q); zeros(R+1, Q)], [eye(R+1); zeros(Q,R+1)] ];
-    
-    %.. Selection Matrix, Eq.7
-    Cp = zeros(nx);
-    Cm = zeros(nx);
-    Cp(1:Q,1:Q) = eye(Q);
-    Cm(Q+1:end, Q+1:end) = eye(R+1);
-
-    %.. TMP Mat
-    P1 = inv(I - exp(-mu*k_p*dt_mc)*Pf);
-    P2 = Pf^m_p;
-
-    %.. Lead Time Prob
-    rho_p0 = 1 - exp(-mu*c_b*dt_mc); % Eq.44 
-    rho_p1 = exp(-mu*c_b*dt_mc)*(1-exp(-mu*k_p*dt_mc)); % Eq.44
-
-    %.. Full Transition
-    Prq = Cm*Pf*inv(I-Cp*Pf); % Eq.42
-    Pqr = Pq*P2*(rho_p0*I + rho_p1*Pf*P1); % Eq.45
-    Pqq = Pqr*Prq;
-        
-    %.. Conditional Dist.
-    pi_q = limitdist(Pqq'); % Prob. Dist after reorder arrives
-    pi_r = Prq*pi_q; % Prob. Dist when reorder is made
-
-    %%% Step 3: Compute pi_np and pi_wp
-    %.. Full duration term of the first T_lv duration of waiting period
-    A1 = zeros(nx);
-    for i = 0:m_p-1
-        A1 = A1 + Pf^i; % I + Pf + Pf^2 + ... + Pf^(m_p-1)
-    end
-    A1 = k_p*A1; % Eq.47-1
-
-    %.. Partial duration term of the first T_lv duration of waiting period
-    A2 = c_a*Pf^m_p; % Eq.47-2
-
-    %.. Remaing partial duration and full duration terms of waiting period
-    ec = exp(-mu*dt_mc);
-    rho0_c = ec*(ec^c_b - 1)/(ec - 1);
-    A3 = rho0_c*Pf^m_p; % Eq.47-3
-    
-    et = exp(-mu*k_p*dt_mc);
-    rho1_c = ec^(c_b+1)*(ec^k_p - 1)/(ec - 1);
-    A4 = rho1_c*P2*Pf*P1; % Eq.47-4
-
-    %.. Distribution of waiting period, Eq.46
-    pi_wp = (A1 + A2 + A3 + A4)*pi_r;
-    T_wp = sum(pi_wp);
-
-    %.. Partial duration and full duration terms of non-waiting period
-    rho_set = (1-exp(-mu*dt_mc))*exp(-mu*dt_mc*(0:k_p-1)); % Eq.15: rho0, rho1,...
-    rho_set = rho_set/(1-exp(-mu*k_p*dt_mc)); % Eq.52: bar(rho0), bar(rho1),...
-    c_set = c_b - (1:k_p); % Eq.51
-    c_set = c_set + (c_set < 0)*k_p; % Eq.51
-    
-    %.. Distribution of non-waiting period
-    pi_np = sum(rho_set.*c_set)*pi_q + k_p*Cp*Pf*inv(I-Cp*Pf)*pi_q; % Eq.49
-    T_np = sum(pi_np);
-
-    %.. Avg. Dist.
-    T_ir = T_np + T_wp;
-    pi_ir = (pi_np + pi_wp)/T_ir; % Eq.53
-    pi_np = pi_np/T_np;
-    pi_wp = pi_wp/T_wp;
-
-    %.. Parking Available Distribution, Eq.34
-    Pdav = zeros(nx,1);
-    for i = 1:nx
-        % Probability of having stock level larger than (i-1)
-        Pdav(i) = sum(pi_ir(1:nx+1-i));
-    end
-
-    %.. Output
-    PI.pi_ir = pi_ir;
-    PI.pi_np = pi_np;
-    PI.pi_wp = pi_wp;
-    PI.pi_q = pi_q;
-    PI.pi_r = pi_r;
-    PI.Pdav = Pdav;
-    
-    T.T_ir = T_ir*dt_mc;
-    T.T_wp = T_wp*dt_mc;
-    T.T_np = T_np*dt_mc;
-end
-
-%%
-function p = limitdist(P)
-%Obtain the stationary probability distribution
-%vector p of an irreducible, recurrent Markov
-%chain by state reduction. P is the transition
-%probabilities matrix of a discrete-time Markov
-%chain or the generator matrix Q.
-% https://www.math.wustl.edu/~feres/Math450Lect04.pdf
-
-[ns, ~]=size(P);
-n=ns;
-p=zeros(n);
-while n>1
-    n1=n-1;
-    s=sum(P(n,1:n1));
-    P(1:n1,n)=P(1:n1,n)/s;
-    n2=n1;
-    while n2>0
-        P(1:n1,n2)=P(1:n1,n2)+P(1:n1,n)*P(n,n2);
-        n2=n2-1;
-    end
-    n=n-1;
-end
-%backtracking
-p(1)=1;
-j=2;
-while j<=ns
-    j1=j-1;
-    p(j)=sum(p(1:j1).*(P(1:j1,j))');
-    j=j+1;
-end
-p=p/(sum(p));
-end
+% function [PI, T] = ExactInDirectPark(Pdmd, Para)
+%     %%% Step 1: Initialize the parameters
+%     %.. Parameter
+%     Q = Para.Q;
+%     R = Para.R;
+%     dt_mc = Para.dt_mc;
+%     dt_park = Para.dt_park;
+%     dt_lv = Para.dt_lv;
+% 
+%     %.. State
+%     xmax = Q + R; % Max State Level: bar(N_sat), p.10
+%     x = (xmax:-1:0)';
+%     nx = length(x); % Dimension of state distribution: bar(N_sat)+1
+% 
+%     %.. Step Count
+%     k_p = round(dt_park/dt_mc); % Eq.40
+%     c_lv = round(dt_lv/dt_mc);
+% 
+%     %.. Constant lead time and residual
+%     mu = 1/Para.mu_lv; % mu = 1/(mean)
+%     m_p = floor(dt_lv/dt_park); % Eq.43
+%     c_a = c_lv - m_p*k_p; % c_a = T_lp/T_mc, Eq.43
+%     c_b = (m_p+1)*k_p - c_lv; % c_b = T_rp/T_mc, Eq.43
+% 
+%     %%% Step 2: Compute pi_q and pi_r
+%     %.. Failure Transition Matrix
+%     I = eye(nx);
+%     Pf = zeros(nx);
+%     eta = zeros(nx,1);
+%     eta(1:length(Pdmd)) = Pdmd;
+%     eta = eta/sum(eta);
+%     for i = 1:nx
+%         Pf(i:end,i) = eta(1:nx-i+1)';
+%         Pf(end,i) = 1 - sum(Pf(1:end-1, i));
+%     end
+% 
+%     %.. Resupply Transition Matrix, Eq.18
+%     Pq = [ [eye(Q); zeros(R+1, Q)], [eye(R+1); zeros(Q,R+1)] ];
+% 
+%     %.. Selection Matrix, Eq.7
+%     Cp = zeros(nx);
+%     Cm = zeros(nx);
+%     Cp(1:Q,1:Q) = eye(Q);
+%     Cm(Q+1:end, Q+1:end) = eye(R+1);
+% 
+%     %.. TMP Mat
+%     P1 = inv(I - exp(-mu*k_p*dt_mc)*Pf);
+%     P2 = Pf^m_p;
+% 
+%     %.. Lead Time Prob
+%     rho_p0 = 1 - exp(-mu*c_b*dt_mc); % Eq.44 
+%     rho_p1 = exp(-mu*c_b*dt_mc)*(1-exp(-mu*k_p*dt_mc)); % Eq.44
+% 
+%     %.. Full Transition
+%     Prq = Cm*Pf*inv(I-Cp*Pf); % Eq.42
+%     Pqr = Pq*P2*(rho_p0*I + rho_p1*Pf*P1); % Eq.45
+%     Pqq = Pqr*Prq;
+% 
+%     %.. Conditional Dist.
+%     pi_q = limitdist(Pqq); % Prob. Dist after reorder arrives
+%     pi_r = Prq*pi_q; % Prob. Dist when reorder is made
+% 
+%     %%% Step 3: Compute pi_np and pi_wp
+%     %.. Full duration term of the first T_lv duration of waiting period
+%     A1 = zeros(nx);
+%     for i = 0:m_p-1
+%         A1 = A1 + Pf^i; % I + Pf + Pf^2 + ... + Pf^(m_p-1)
+%     end
+%     A1 = k_p*A1; % Eq.47-1
+% 
+%     %.. Partial duration term of the first T_lv duration of waiting period
+%     A2 = c_a*Pf^m_p; % Eq.47-2
+% 
+%     %.. Remaing partial duration and full duration terms of waiting period
+%     ec = exp(-mu*dt_mc);
+%     rho0_c = ec*(ec^c_b - 1)/(ec - 1);
+%     A3 = rho0_c*Pf^m_p; % Eq.47-3
+% 
+%     et = exp(-mu*k_p*dt_mc);
+%     rho1_c = ec^(c_b+1)*(ec^k_p - 1)/(ec - 1);
+%     A4 = rho1_c*P2*Pf*P1; % Eq.47-4
+% 
+%     %.. Distribution of waiting period, Eq.46
+%     pi_wp = (A1 + A2 + A3 + A4)*pi_r;
+%     T_wp = sum(pi_wp);
+% 
+%     %.. Partial duration and full duration terms of non-waiting period
+%     rho_set = (1-exp(-mu*dt_mc))*exp(-mu*dt_mc*(0:k_p-1)); % Eq.15: rho0, rho1,...
+%     rho_set = rho_set/(1-exp(-mu*k_p*dt_mc)); % Eq.52: bar(rho0), bar(rho1),...
+%     c_set = c_b - (1:k_p); % Eq.51
+%     c_set = c_set + (c_set < 0)*k_p; % Eq.51
+% 
+%     %.. Distribution of non-waiting period
+%     pi_np = sum(rho_set.*c_set)*pi_q + k_p*Cp*Pf*inv(I-Cp*Pf)*pi_q; % Eq.49
+%     T_np = sum(pi_np);
+% 
+%     %.. Avg. Dist.
+%     T_ir = T_np + T_wp;
+%     pi_ir = (pi_np + pi_wp)/T_ir; % Eq.53
+%     pi_np = pi_np/T_np;
+%     pi_wp = pi_wp/T_wp;
+% 
+%     %.. Parking Available Distribution, Eq.34
+%     Pdav = zeros(nx,1);
+%     for i = 1:nx
+%         % Probability of having stock level larger than (i-1)
+%         Pdav(i) = sum(pi_ir(1:nx+1-i));
+%     end
+% 
+%     %.. Output
+%     PI.pi_ir = pi_ir;
+%     PI.pi_np = pi_np;
+%     PI.pi_wp = pi_wp;
+%     PI.pi_q = pi_q;
+%     PI.pi_r = pi_r;
+%     PI.Pdav = Pdav;
+% 
+%     T.T_ir = T_ir*dt_mc;
+%     T.T_wp = T_wp*dt_mc;
+%     T.T_np = T_np*dt_mc;
+% end

@@ -14,7 +14,7 @@ addpath([libdir, 'CommonSource'])
 %% Test Param
 %.. Sim time
 dt_sim = 1; % [day]
-time_sim = 0:dt_sim:365*15000;
+time_sim = 0:dt_sim:365*1000;
 
 %.. Marcov Chain Period
 dt_mc = dt_sim;  % [day]
@@ -169,6 +169,7 @@ f = p_mc;
 lam = 1/mu_LV;
 
 %.. Method 1
+disp('Time Based Method:')
 tic
 for i = 1:100
 [xx, PI1, T1] = ExactDirectEventBased(p_fail,p_type,Q,R,lam,dt_mc,T0_LV,n_sat);
@@ -195,7 +196,8 @@ figure(6); hold on
 plot(xx(1:13), PI1.pi_wp(1:13), 'r*')
 xlim([xx(13)-0.5, xx(1)+0.5])
 
-%.. Method 2
+%.. Method 18
+disp('Ratio Based Method:')
 tic
 for i = 1:100
 [xx, PI2, T2] = ExactDirectRatioBased(p_fail,p_type,Q,R,lam,dt_mc,T0_LV,n_sat);

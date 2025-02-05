@@ -101,9 +101,10 @@ function [x, PI, T] = ExactDirectRatioBased(f, f_type, Q, R, mu, dt_mc, dt_lv, n
     pi_wp = pi_wp/sum(pi_wp);
     
     %.. Compuite Avg. period of each conditional distribution.
-    T_np = a_np/a_tp*m*dt_mc;
-    T_wp = a_wp/a_tp*m*dt_mc;
-    T_dr = T_np + T_wp;
+    T_tp = m*dt_mc;
+    T_np = a_np/(a_tp*m)*T_tp;
+    T_wp = a_wp/(a_tp*m)*T_tp;
+    T_dr = T_np + T_wp + T_tp;
     
     %.. Output
     PI.pi_dr = pi_dr;
@@ -113,6 +114,6 @@ function [x, PI, T] = ExactDirectRatioBased(f, f_type, Q, R, mu, dt_mc, dt_lv, n
     PI.pi_r = pi_r;
     
     T.T_dr = T_dr; 
-    T.T_wp = T_wp; 
+    T.T_wp = T_wp + T_tp; 
     T.T_np = T_np; 
 end
