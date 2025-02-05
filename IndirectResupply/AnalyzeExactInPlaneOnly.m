@@ -26,7 +26,6 @@ cnt_plane   =   round(dt_plane/dt_sim);
 %.. Failure rate (test parameter, the demand distribution is not Poisson)
 p_fail  =   0.05/365; % [#/day] 0.05, 0.1, 0.15
 p_sim   =   p_fail * dt_sim;    % [#/dt_sim]
-p_mc    =   p_fail * dt_mc;  % [#/dt_drfit]
 
 %.. Failure type
 p_type = 0; % 0:Constant failure, 1:State Dependent failure
@@ -42,10 +41,10 @@ Xnum = 0:1:Xmax; % State Counts
 
 %.. Parking Availablity (Test distribution)
 Dmax = ceil(Xmax/Q); % Max Demend Level
-Pav = sqrt(Dmax+1:-1:1); % Test parking stock distribution
+Pav = sqrt(Dmax+1:-1:1); % Test parking stock distribution, Pav(k): Pr. having k-1 batch of spares
 Pav = Pav/sum(Pav); 
 Pav_sum = cumsum(Pav);
-Kappa = [1, 1 - Pav_sum(1:end-1)];
+Kappa = [1, 1 - Pav_sum(1:end-1)]; % Kappa(k): Pr. having more than k-1 batch of spares
 Nav = 0:1:Dmax; % Demand Count
 
 %% (Q, R) Policy with fixed time order
@@ -75,12 +74,12 @@ for iter = 1:iter_max
     for i = 1:length(time_sim)
         % 1. Generate Fail Sample at Every Time Step
         if p_type == 0 %.. Const Failure Rate
-            N_fail = poissrnd(n_sat*p_sim, 1);
+            N_fail = CustomPoisRnd(n_sat*p_sim, 1);
         else %.. State Dependant Failure Rate
             if Non_k > n_sat
-                N_fail = poissrnd(n_sat*p_sim, 1);
+                N_fail = CustomPoisRnd(n_sat*p_sim, 1);
             else
-                N_fail = poissrnd(Non_k*p_sim, 1);
+                N_fail = CustomPoisRnd(Non_k*p_sim, 1);
             end
         end
         
@@ -148,7 +147,7 @@ ylabel('Probability')
 
 
 %% Run Analysis Method
-[xx, PI, T] = ExactInDirectPlane(p_mc, p_type, n_sat, Kappa, Q, R, dt_mc, dt_plane);
+[xx, PI, T] = ExactInDirectPlane(p_sim, p_type, n_sat, Kappa, Q, R, dt_mc, dt_plane);
 
 figure(2); hold on
 plot(xx, PI.pi_ir, 'r*')

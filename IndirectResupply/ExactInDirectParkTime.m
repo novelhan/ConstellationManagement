@@ -19,7 +19,7 @@
 % Analysis and Design of Satellite Constellation Spare Strategy Using Markov Chain
 % https://doi.org/10.48550/arXiv.2408.09250
 
-function [x, PI, T] = ExactInDirectPark(Eta, Q, R, dt_mc, dt_park, dt_mu_lv, dt_bias_lv)
+function [x, PI, T] = ExactInDirectParkTime(Eta, Q, R, dt_mc, dt_park, dt_mu_lv, dt_bias_lv)
     %%% Step 1: Initialize the parameters
     %.. State
     xmax = Q + R; % Max State Level: bar(N_sat), p.10
@@ -38,6 +38,16 @@ function [x, PI, T] = ExactInDirectPark(Eta, Q, R, dt_mc, dt_park, dt_mu_lv, dt_
     
     %%% Step 2: Compute pi_q and pi_r
     %.. Failure Transition Matrix of Parking Orbit, Eq.41
+    eta = Eta;
+    if length(eta) <= nx
+        Eta = zeros(nx,1);
+        Eta(1:length(eta)) = eta;
+    else
+        Eta = eta(1:nx);
+        Eta(end) = Eta(end) + sum(eta(nx+1:end));
+    end
+    Eta = Eta/sum(Eta);
+
     I = eye(nx);
     Pf = zeros(nx);
     for i = 1:nx
@@ -68,7 +78,7 @@ function [x, PI, T] = ExactInDirectPark(Eta, Q, R, dt_mc, dt_park, dt_mu_lv, dt_
     Pqq = Pqr*Prq;
         
     %.. Conditional Dist.
-    pi_q = limitdist(Pqq'); % Prob. Dist after reorder arrives
+    pi_q = limitdist(Pqq); % Prob. Dist after reorder arrives
     pi_r = Prq*pi_q; % Prob. Dist when reorder is made
 
     %%% Step 3: Compute pi_np and pi_wp
@@ -111,7 +121,7 @@ function [x, PI, T] = ExactInDirectPark(Eta, Q, R, dt_mc, dt_park, dt_mu_lv, dt_
     pi_wp = pi_wp/T_wp;
 
     %.. Parking Available Distribution, Eq.34
-    Pdav = zeros(1,nx);
+    Pdav = zeros(nx,1);
     for i = 1:nx
         % Probability of having stock level larger than (i-1)
         Pdav(i) = sum(pi_ir(1:nx+1-i));
@@ -130,37 +140,4 @@ function [x, PI, T] = ExactInDirectPark(Eta, Q, R, dt_mc, dt_park, dt_mu_lv, dt_
     T.T_ir = T_ir*dt_mc;
     T.T_wp = T_wp*dt_mc;
     T.T_np = T_np*dt_mc;
-end
-
-function p = limitdist(P)
-%Obtain the stationary probability distribution
-%vector p of an irreducible, recurrent Markov
-%chain by state reduction. P is the transition
-%probabilities matrix of a discrete-time Markov
-%chain or the generator matrix Q.
-% https://www.math.wustl.edu/~feres/Math450Lect04.pdf
-
-[ns, ~]=size(P);
-n=ns;
-p=zeros(n);
-while n>1
-    n1=n-1;
-    s=sum(P(n,1:n1));
-    P(1:n1,n)=P(1:n1,n)/s;
-    n2=n1;
-    while n2>0
-        P(1:n1,n2)=P(1:n1,n2)+P(1:n1,n)*P(n,n2);
-        n2=n2-1;
-    end
-    n=n-1;
-end
-%backtracking
-p(1)=1;
-j=2;
-while j<=ns
-    j1=j-1;
-    p(j)=sum(p(1:j1).*(P(1:j1,j))');
-    j=j+1;
-end
-p=p/(sum(p));
 end

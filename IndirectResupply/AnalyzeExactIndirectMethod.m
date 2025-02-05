@@ -5,10 +5,16 @@ close all
 clear all
 clc
 
+%.. PATH
+mfilepath = pwd;
+idcs = strfind(mfilepath,'\');
+libdir = mfilepath(1:idcs(end));
+addpath([libdir, 'CommonSource'])
+
 %% Test Param
 %.. Sim time
 dt_sim      =   1;                  % [day]
-time_sim    =   0:dt_sim:365*1000;
+time_sim    =   0:dt_sim:365*100;
 
 %.. Marcov Chain Period
 dt_mc       =   dt_sim;                 % [day]
@@ -37,7 +43,7 @@ cnt_lv      =   round(dt_lv/dt_sim);
 
 %.. Failure rate 
 %!! If failure rate >> resupply speed -> the method will give poor result
-p_fail      =   0.15/365;            % [#/day]
+p_fail      =   0.1/365;            % [#/day]
 p_sim       =   p_fail * dt_sim;    % [#/dt_sim]
 p_mc        =   p_fail * dt_mc;  % [#/dt_drfit]
 p_type      =   0; % 0 for const, 1 for state dependant
@@ -48,7 +54,7 @@ Ri      =   n_sat + 2;
 
 %.. Parking (Q,R) Policy Parameter
 kq      =   8;
-kr      =   8;
+kr      =   7;
 Qp      =   Qi*kq;
 Rp      =   Qi*kr;
 
@@ -121,12 +127,12 @@ for itr = 1:iter_max
         %%% 1. Generate Sample of In-Plane Failure at Every Time Step
         for i = 1:n_plane
             if p_type == 0 %.. Const Failure Rate
-                N_fail = poissrnd(n_sat*p_sim, 1);
+                N_fail = CustomPoisRnd(n_sat*p_sim, 1);
             else %.. State Dependant Failure Rate
                 if Ni_on_k(i) > n_sat
-                    N_fail = poissrnd(n_sat*p_sim, 1);
+                    N_fail = CustomPoisRnd(n_sat*p_sim, 1);
                 else
-                    N_fail = poissrnd(Ni_on_k(i)*p_sim, 1);
+                    N_fail = CustomPoisRnd(Ni_on_k(i)*p_sim, 1);
                 end
             end
 
@@ -180,10 +186,11 @@ for itr = 1:iter_max
 
         %%% 4. Check Parking Reorder
         for j = 1:n_park
-            % LV must be available, RAAN Contact Moment, # of spares < kr
-            if Lv_on(j) == -1 && v_park2plane(j,k) ~= 0 && Np_on_k(j) <= kr
+            % LV must be available, RAAN Contact Moment, # of spares < kr 
+%             if Lv_on(j) == -1 && v_park2plane(j,k) ~= 0 && Np_on_k(j) <= kr % Will save time (If we use Q >= R)
+            if Lv_on(j) == -1 && Np_on_k(j) <= kr
                 % Sample Lead Time and Save
-                t_Lv = dt_lv + exprnd(mu_lv,1);
+                t_Lv = dt_lv + CustomExpRnd(mu_lv,1);
                 Lv_on(j) = ceil( t_Lv/dt_sim );
                 
                 % Update Xp_lv
@@ -212,6 +219,8 @@ end
 
 
 %% Plot Simulation Result
+close all
+
 xxi_edge = -0.5:1:(Xi_max+0.5);
 xxp_edge = -0.5:1:(Xp_max+0.5);
 dmd_edge = -0.5:1:(Di_max+0.5);
@@ -230,8 +239,6 @@ ylabel('Number of parking stock for entire period')
 
 figure(3); hold on
 histogram('BinEdges', xxi_edge, 'BinCounts', sum(Xi_on,2),'Normalization','probability')
-% histogram('BinEdges', xxi_edge, 'BinCounts', Xi_on(:,2),'Normalization','probability')
-% histogram('BinEdges', xxi_edge, 'BinCounts', Xi_on(:,3),'Normalization','probability')
 xlabel('Number of in-plane stock for entire period')
 ylabel('Probability')
 
@@ -250,8 +257,6 @@ ylabel('Probability')
 
 figure(4); hold on
 histogram('BinEdges', xxp_edge, 'BinCounts', sum(Xp_on,2),'Normalization','probability')
-% histogram('BinEdges', xxp_edge, 'BinCounts', Xp_on(:,2),'Normalization','probability')
-% histogram('BinEdges', xxp_edge, 'BinCounts', Xp_on(:,3),'Normalization','probability')
 xlabel('Number of parking stock for entire period')
 ylabel('Probability')
 

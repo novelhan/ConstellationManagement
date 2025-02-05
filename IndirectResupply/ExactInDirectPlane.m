@@ -21,7 +21,7 @@
 % https://doi.org/10.48550/arXiv.2408.09250
 
 
-function [x, PI, T] = ExactInDirectPlane(f_mc, f_type, n_sat, kappa, Q, R, dt_mc, dt_plane)
+function [x, PI, T] = ExactInDirectPlane(f_sim, f_type, n_sat, kappa, Q, R, dt_mc, dt_plane)
     %%% Step 1: Initialize the parameters
     %.. State
     xmax = Q + R; % Max State Level: bar(N_sat), p.10
@@ -34,16 +34,17 @@ function [x, PI, T] = ExactInDirectPlane(f_mc, f_type, n_sat, kappa, Q, R, dt_mc
 
     %%% Step 2: Compute pi_q and pi_r
     %.. Failure Transition Matrix (Prq), Eqs.11~12
+    f_mc = f_sim*dt_mc; % Failure rate per unit time step
     I = eye(nx);
     Pf = zeros(nx);
     for i = 1:nx
         if f_type == 0 % Constant Failure Rate
-            Pf(i:end,i) = poisspdf(0:nx-i, n_sat*f_mc)';        
+            Pf(i:end,i) = CustomPoisPdf(0:nx-i, n_sat*f_mc)';        
         else % Stock Level Dependant Failure Rate
             if (nx-i) > n_sat
-                Pf(i:end,i) = poisspdf(0:nx-i, n_sat*f_mc)';        
+                Pf(i:end,i) = CustomPoisPdf(0:nx-i, n_sat*f_mc)';        
             else
-                Pf(i:end,i) = poisspdf(0:nx-i, (nx-i)*f_mc)';  
+                Pf(i:end,i) = CustomPoisPdf(0:nx-i, (nx-i)*f_mc)';  
             end
         end
         Pf(end,i) = 1 - sum(Pf(1:end-1, i));
@@ -77,7 +78,7 @@ function [x, PI, T] = ExactInDirectPlane(f_mc, f_type, n_sat, kappa, Q, R, dt_mc
     Pqq = Pqr*Prq;
         
     %.. Conditional Dist. Eq.37
-    pi_q = limitdist(Pqq'); % Prob. Dist right before RAAN Contact
+    pi_q = limitdist(Pqq); % Prob. Dist right before RAAN Contact
     pi_r = Prq*pi_q; % Prob. Dist right after RAAN Contact
     
     %%% Step 3: Compute pi_ir
@@ -102,37 +103,4 @@ function [x, PI, T] = ExactInDirectPlane(f_mc, f_type, n_sat, kappa, Q, R, dt_mc
     PI.Pqr = Pqr;
     
     T.T_ir = k*dt_mc; % T_ir = T_plane = k*dt_mc
-end
-
-function p = limitdist(P)
-%Obtain the stationary probability distribution
-%vector p of an irreducible, recurrent Markov
-%chain by state reduction. P is the transition
-%probabilities matrix of a discrete-time Markov
-%chain or the generator matrix Q.
-% https://www.math.wustl.edu/~feres/Math450Lect04.pdf
-
-[ns, ~]=size(P);
-n=ns;
-p=zeros(n);
-while n>1
-    n1=n-1;
-    s=sum(P(n,1:n1));
-    P(1:n1,n)=P(1:n1,n)/s;
-    n2=n1;
-    while n2>0
-        P(1:n1,n2)=P(1:n1,n2)+P(1:n1,n)*P(n,n2);
-        n2=n2-1;
-    end
-    n=n-1;
-end
-%backtracking
-p(1)=1;
-j=2;
-while j<=ns
-    j1=j-1;
-    p(j)=sum(p(1:j1).*(P(1:j1,j))');
-    j=j+1;
-end
-p=p/(sum(p));
 end

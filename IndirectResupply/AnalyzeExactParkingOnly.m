@@ -13,8 +13,8 @@ addpath([libdir, 'CommonSource'])
 
 %% Test Param
 %.. Sim time
-dt_sim      =   0.5;                  % [day]
-time_sim    =   0:dt_sim:365*1000;
+dt_sim      =   1;                  % [day]
+time_sim    =   0:dt_sim:365*5000;
 
 %.. Marcov Chain Period
 dt_mc       =   dt_sim;                 % [day]
@@ -24,17 +24,18 @@ dt_plane    =   70;     % [day]
 cnt_plane   =   round(dt_plane/dt_sim);
 
 %.. Parking Period (Time duration of parking for subsequent in-plane contact)
-dt_park  =   12;     % [day]
+dt_park  =   15;     % [day]
 cnt_park =   round(dt_park/dt_mc);
 
 %.. LV Lead Time (Modeled as bias shifted exponential distribution)
-dt_mu_lv    =   50;     % [day]
+dt_mu_lv    =   60;     % [day]
 dt_bias_lv  =   20;     % [day]
 cnt_lv_max  =   ceil((dt_bias_lv + dt_mu_lv + 5*dt_mu_lv)/dt_mc); % Max Lead Time Bin (mean + 5*sigma) [dt_sim]
 
 %.. Parking (Q,R) Policy Parameter (For this, Q > R)
-Qp      =   6;
-Rp      =   3;
+%.. Time based should only work for Q > R but it gives accurate result when Q = R. Need investigation.
+Qp      =   8;
+Rp      =   8;
 
 %.. State Parameter
 Xmax = Qp + Rp; % Max State Level
@@ -56,8 +57,11 @@ Xon = zeros(Xmax+1, iter_max);
 % The histogram of the number of stock right after the resupply moment
 Xq = zeros(Xmax+1, iter_max);
 
-% The histogram of the  number of stock at the reordering moment
+% The histogram of the number of stock at the reordering moment
 Xr =  zeros(Xmax+1, iter_max);
+
+% The histogram of the number of stock at the contact moment
+Xc =  zeros(Xmax+1, iter_max);
 
 % Lead time distribution
 Xnp = zeros(cnt_lv_max, iter_max); 
@@ -102,18 +106,19 @@ for i = 1:iter_max
 
         %%% 2. Generate Fail Sample at Every Contact
         if mod(k,cnt_park) == 0
-            N_dmd = poissrnd(p_drift, 1); %.. Const Failure Rate
-        else
-            N_dmd = 0;
+            N_dmd = CustomPoisRnd(p_drift, 1); %.. Const Failure Rate
+            
+            % Update Xc
+            Xc(Non_k+1,i) = Xc(Non_k+1,i) + 1; % +1 for index
+            
+            % Update the number of available spares
+            Non_k = max([Non_k - N_dmd, 0]);
         end
-        
-        % Update the number of available spares
-        Non_k = max([Non_k - N_dmd, 0]);
         
         %%% 3. Check Reorder at Every Time Step
         if cnt_lv == -1 && Non_k <= Rp
             % Sample Lead Time and Save
-            dt_lv = dt_bias_lv + exprnd(dt_mu_lv,1);
+            dt_lv = dt_bias_lv + CustomExpRnd(dt_mu_lv,1);
             cnt_lv = ceil(dt_lv/dt_mc); % If dt_lv: [0,1] -> 1
 
             if cnt_lv_max < cnt_lv
@@ -167,43 +172,116 @@ histogram(Non(Non <= Rp),'Normalization','probability')
 xlabel('Number of stock for wait period')
 ylabel('Probability')
 
-figure(7)
+figure(7); hold on
+histogram('BinEdges', xx_edge, 'BinCounts', sum(Xc,2),'Normalization','probability')
+xlabel('Number of stock at the contact moment')
+ylabel('Probability')
+
+figure(8)
 histogram('BinEdges', dt_edge(1:end-1), 'BinCounts', sum(Xlv(1:end-1,:),2 ),'Normalization','probability')
 xlabel('Lead Time Distribution')
 ylabel('Probability')
 
-figure(8)
-histogram('BinEdges', dt_edge(1:end-1), 'BinCounts', sum(Xnp(1:end-1,:),2 ),'Normalization','probability')
-xlabel('Lead Time Distribution')
+figure(9)
+histogram('BinEdges', xx_edge, 'BinCounts', cumsum(sum(Xc,2),'reverse')/sum(sum(Xc,2)))
+xlabel('Parking Spares Availability')
 ylabel('Probability')
+
 
 %% Run Analysis Method
 %.. In-plane demand parameter (test)
-Eta = poisspdf(0:Xmax, p_drift);
-[xx, PI, T] = ExactInDirectPark(Eta,Qp,Rp,dt_mc,dt_park,dt_mu_lv,dt_bias_lv);
-pi_q = flip(sum(Xq,2)/sum(sum(Xq,2)));
-pi_r = flip(sum(Xr,2)/sum(sum(Xr,2)));
+Eta = CustomPoisPdf(0:Xmax, p_drift);
+% Eta = [0.2207
+%     0.5372
+%     0.1839
+%     0.0439
+%     0.0108
+%     0.0026
+%     0.0006
+%     0.0002
+%     0.0000
+%     0.0000
+%     0.0000
+%     0.0000];
+
+%.. Method 1
+disp('Time Based Method:')
+tic
+for i = 1:100
+[xx, PI1, T1] = ExactInDirectParkTime(Eta,Qp,Rp,dt_mc,dt_park,dt_mu_lv,dt_bias_lv);
+end
+toc
 
 figure(2); hold on
-plot(xx, PI.pi_ir, 'r*')
-legend('Sim.', 'Sol.', 'location', 'best')
+plot(xx, PI1.pi_ir, 'r*')
 
 figure(3); hold on
-plot(xx, PI.pi_q, 'r*')
-legend('Sim.', 'Sol.', 'location', 'best')
+plot(xx, PI1.pi_q, 'r*')
 
 figure(4); hold on
-plot(xx, PI.pi_r, 'r*')
-legend('Sim.', 'Sol.', 'location', 'best')
+plot(xx, PI1.pi_r, 'r*')
 
 figure(5); hold on
-plot(xx, PI.pi_np, 'r*')
-legend('Sim.', 'Sol.', 'location', 'best')
+plot(xx, PI1.pi_np, 'r*')
 
 figure(6); hold on
-plot(xx, PI.pi_wp, 'r*')
-legend('Sim.', 'Sol.', 'location', 'best')
+plot(xx, PI1.pi_wp, 'r*')
+
+figure(9); hold on
+plot(Xnum, PI1.Pdav, 'r*')
+
+
+%.. Method 2
+disp('Ratio Based Method:')
+tic
+for i = 1:100
+[xx, PI2, T2] = ExactInDirectParkRatio(Eta,Qp,Rp,dt_mc,dt_park,dt_mu_lv,dt_bias_lv);
+end
+toc
+
+figure(2); hold on
+plot(xx, PI2.pi_ir, 'go')
+legend('Sim.', 'Sol.1', 'Sol.2', 'location', 'best')
+
+figure(3); hold on
+plot(xx, PI2.pi_q, 'go')
+legend('Sim.', 'Sol.1', 'Sol.2', 'location', 'best')
+
+figure(4); hold on
+plot(xx, PI2.pi_r, 'go')
+legend('Sim.', 'Sol.1', 'Sol.2', 'location', 'best')
+
+figure(5); hold on
+plot(xx, PI2.pi_np, 'go')
+legend('Sim.', 'Sol.1', 'Sol.2', 'location', 'best')
+
+figure(6); hold on
+plot(xx, PI2.pi_wp, 'go')
+legend('Sim.', 'Sol.1', 'Sol.2', 'location', 'best')
+
+figure(9); hold on
+plot(Xnum, PI2.Pdav, 'go')
+legend('Sim.', 'Sol.1', 'Sol.2', 'location', 'best')
 
 dtxx = dt_bias_lv:cnt_lv_max*dt_mc;
-figure(7); hold on
+figure(8); hold on
 plot(dtxx/dt_mc, exp(-(dtxx - dt_bias_lv)/dt_mu_lv)*(1-exp(-dt_mc/dt_mu_lv)),'r*')
+
+
+%%%%
+nx = length(xx);
+[~,tt] = size(PI2.pi_full);
+
+figure(); hold on
+plot(1:tt, PI2.pi_full,'o')
+
+Xtmp = zeros(nx,tt);
+for i = 1:tt
+    for n = 1:nx
+        Xtmp(n,i) = sum(sum(Non(i:tt:length(Non),:) == (n-1)));
+    end
+end
+Xtmp = Xtmp/sum(Xtmp(:,1));
+set(gca,'ColorOrderIndex',1)
+plot(1:tt, flip(Xtmp),'-')
+
