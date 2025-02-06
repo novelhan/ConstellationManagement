@@ -1,8 +1,14 @@
 % This script vaildates the failure transition matrix of poisson failure model
-
 close all
 clear all
 clc
+
+%.. PATH
+mfilepath = pwd;
+idcs = strfind(mfilepath,'\');
+libdir = mfilepath(1:idcs(end));
+addpath([libdir, 'CommonSource'])
+
 % rng('default')
 
 % Test Param
@@ -23,7 +29,7 @@ N_on(N_on < 0) = 0;
 nx = N_sat + 1; % Dim. of state
 Pf = zeros(nx); % Failure transition matrix
 for i = 1:nx
-    Pf(i:end,i) = poisspdf(0:nx-i, lambda_sim)';
+    Pf(i:end,i) = CustomPoisPdf(0:nx-i, lambda_sim)';
     Pf(end,i) = 1 - sum(Pf(1:end-1, i));
 end
 pi_0 = zeros(nx,1);
@@ -39,31 +45,3 @@ xlabel('Day'); ylabel('# of sat.')
 figure(2); hold on % Distribution at the last day
 histogram(N_on(end,:),'Normalization','probability')
 plot((N_sat:-1:0), pi_f', 'r*')
-
-
-function [Y] = CustomPoisRnd(p, m, n)
-    % Input Handling
-    if nargin == 1
-        m = 1;
-        n = 1;
-    elseif nargin == 2
-        n = 1;
-    end
-    
-    % Compute Poisson CDF (consider upto mean + 10-sigma)
-    Zset = 0:1:ceil(11*p);
-    PDF = p.^Zset*exp(-p)./factorial(Zset); 
-    CDF = cumsum(PDF);
-    CDF(end) = 1;
-    
-    % Generate uniform distribution
-    Z = rand(m,n);
-    Y = zeros(m,n);
-    for i = 1:m
-        for j = 1:n
-            tmp = CDF - Z(i,j);
-            idx = find(tmp>=0,1);
-            Y(i,j) = Zset(idx);
-        end
-    end
-end
