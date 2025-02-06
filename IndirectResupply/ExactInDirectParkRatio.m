@@ -36,8 +36,8 @@ function [x, PI, T] = ExactInDirectParkRatio(Eta, Q, R, dt_mc, dt_park, dt_mu_lv
         Eta = zeros(nx,1);
         Eta(1:length(eta)) = eta;
     else
-        Eta = eta(1:nx);
-        Eta(end) = Eta(end) + sum(eta(nx+1:end));
+%         Eta = eta(1:nx);
+%         Eta(end) = Eta(end) + sum(eta(nx+1:end));
     end
     Eta = Eta/sum(Eta);
     
@@ -109,6 +109,9 @@ function [x, PI, T] = ExactInDirectParkRatio(Eta, Q, R, dt_mc, dt_park, dt_mu_lv
         pi_wp(:,i) = PI_full(nx+1:2*nx,i);
         pi_tp(:,i) = sum(reshape(PI_full(2*nx+1:end,i),nx,[]),2);
     end
+    a_np = sum(mean(pi_np,2));
+    a_wp = sum(mean(pi_wp,2));
+    a_tp = sum(mean(pi_tp,2))/(k_lv-1)*k_lv; % Only k_lv - 1 terms are considered for the states
 
     %.. Avg. Dist.
     pi_ir = mean(pi_full,2);
@@ -148,6 +151,14 @@ function [x, PI, T] = ExactInDirectParkRatio(Eta, Q, R, dt_mc, dt_park, dt_mu_lv
     PI.pi_q = pi_q;
     PI.pi_r = pi_r;
     PI.Pdav = Pdav;
-
-    T=0;
+    
+    %.. Compuite Avg. period of each conditional distribution.
+    T_tp = k_lv*dt_mc;
+    T_np = a_np/a_tp*T_tp;
+    T_wp = a_wp/a_tp*T_tp;
+    T_ir = T_np + T_wp + T_tp;
+    
+    T.T_ir = T_ir; 
+    T.T_wp = T_wp + T_tp; 
+    T.T_np = T_np; 
 end

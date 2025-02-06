@@ -49,11 +49,21 @@ function [x, PI, T] = ExactInDirectPlane(f_sim, f_type, n_sat, kappa, Q, R, dt_m
         end
         Pf(end,i) = 1 - sum(Pf(1:end-1, i));
     end
-    Prq = Pf^k; % Eq.33
+    
+    Pf_set = zeros(nx,nx,k+1);
+    Pf_set(:,:,1) = I;
+    for i = 2:k+1
+        Pf_set(:,:,i) = Pf*Pf_set(:,:,i-1);
+    end
+    Prq = Pf_set(:,:,end); % Eq.33
+%     Prq = Pf^k;
 
     %.. Resupply Transition Matrix (Pqr), Eq. 36
     m = ceil(nx/Q); % This variable is needed only for implementation of the code
     Pq = zeros(m*Q);
+    if length(kappa) < m
+        kappa = [kappa; zeros(m,1)];
+    end
     for i = 1:m % row
         for j = i:m % column
             x_idx = (Q*(i-1) + 1):(Q*i);
@@ -85,13 +95,19 @@ function [x, PI, T] = ExactInDirectPlane(f_sim, f_type, n_sat, kappa, Q, R, dt_m
     %.. Demand Distributio, Eq.39
     pi_bf = zeros(m*Q,1);
     pi_bf(1:nx) = pi_r; % Dim. m*Q x 1
-    pi_dmd = (sum(reshape(pi_bf,Q,m)))'; % Dim. m x 1
+    if Q == 1
+        pi_dmd = pi_bf; % Dim. m x 1
+    else
+        pi_dmd = (sum(reshape(pi_bf,Q,m)))'; % Dim. m x 1
+    end
+    
 
     %.. Weighted Dist. Eq.38
-    A1 = I;
-    for i = 1:k-1
-        A1 = A1 + Pf^i;
-    end
+%     A1 = I;
+%     for i = 1:k-1
+%         A1 = A1 + Pf^i;
+%     end
+    A1 = sum(Pf_set(:,:,1:k),3);
     pi_ir = A1*pi_q/k;
 
     %.. Output

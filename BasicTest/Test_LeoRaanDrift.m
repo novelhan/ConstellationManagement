@@ -1,9 +1,9 @@
+% This script tests the orbital tranfer feasibility check prediction between parking orbit and
+% constellation orbit.
+
 close all
 clear all
 clc
-
-% This script tests the orbital tranfer feasibility check prediction between parking orbit and
-% constellation orbit.
 
 %.. Conversion Parameters
 Y2D = 365;      % Year to Day
@@ -13,7 +13,7 @@ D2R = 1/R2D;
 
 %.. Sim Time
 T_f         =   10*Y2D; % Simulation Period [Day]
-dt_sim      =   0.5; % Time step for simulation [Day]
+dt_sim      =   1; % Time step for simulation [Day]
 T_sim       =   0:dt_sim:T_f;
 
 %.. Earth Parameters
@@ -24,7 +24,7 @@ J2_earth    =   0.00108263;
 %.. In-Orbit Parameters
 a_orbit     =   R_earth + 1200;
 e_orbit     =   0;
-i_orbit     =   50 * R2D;
+i_orbit     =   50 * D2R;
 n_orbit     =   sqrt(mu_earth/a_orbit^3);
 N_orbit     =   40;
 Wdot_orbit  =   -3/2 * J2_earth* n_orbit * R_earth^2 / (a_orbit*(1-e_orbit))^2 * cos(i_orbit);
@@ -32,9 +32,9 @@ Wdot_orbit  =   -3/2 * J2_earth* n_orbit * R_earth^2 / (a_orbit*(1-e_orbit))^2 *
 %.. Parking-Orbit Parameters
 a_park      =   R_earth + 500;
 e_park      =   0;
-i_park      =   50 * R2D;
+i_park      =   50 * D2R;
 n_park      =   sqrt(mu_earth/a_park^3);
-N_park      =   3;
+N_park      =   2;
 Wdot_park   =   -3/2 * J2_earth * n_park * R_earth^2 / (a_park*(1-e_park))^2 * cos(i_park);
 
 %.. Initial Parking/In Orbit Distribution
@@ -51,7 +51,7 @@ dt_park     =   2*pi/ N_orbit / Wdrift_dt; % Every Contact Period for Parking or
 dt_orbit    =   2*pi/ N_park / Wdrift_dt; % Every Contact Period for In-Plane orbit [dt]
 
 v_i2j = zeros(N_park, length(T_sim)); % Index matrix of i th parking orbit at j th time index (Value = in orbit index)
-v_j2i = zeros(N_orbit, length(T_sim));
+v_j2i = zeros(N_orbit, length(T_sim)); % Index matrix of i th in-plane orbit at j th time index (Value = parking orbit index)
 for i = 1:N_park
     [min_angle, min_orbit] = min(mod(Worbit0 - Wpark0(i),2*pi));
     T0 = min_angle/Wdrift_dt;   % Time for first RAAN match
