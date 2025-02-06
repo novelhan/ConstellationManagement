@@ -64,8 +64,6 @@ Xr =  zeros(Xmax+1, iter_max);
 Xc =  zeros(Xmax+1, iter_max);
 
 % Lead time distribution
-Xnp = zeros(cnt_lv_max, iter_max); 
-Xnp1 = zeros(cnt_lv_max, iter_max); 
 Xlv = zeros(cnt_lv_max, iter_max); 
 
 %% Run Each Simulation
@@ -75,7 +73,6 @@ for i = 1:iter_max
     
     % ETC 
     cnt_lv = -1; % -1 for not ordered
-    cnt_np = 0;
     lv_cnt = 0;
     
     % Apply Policy
@@ -90,18 +87,9 @@ for i = 1:iter_max
             cnt_lv = -1;
             lv_cnt = lv_cnt + 1;
 
-            % Reset Non-Reordering period count
-            cnt_np = 0;
-            cnt_np1 = ceil(k/cnt_park)*cnt_park - k;
-            Xnp1(cnt_np1+1,i) = Xnp1(cnt_np1+1,i) + 1;
-            
-
         elseif cnt_lv > 0 % Wait for arrival
             cnt_lv = cnt_lv - 1;
 
-        elseif cnt_lv == -1 % Has not been ordered
-            % Increase Non-Reordering period count
-            cnt_np = cnt_np + 1;
         end
 
         %%% 2. Generate Fail Sample at Every Contact
@@ -191,18 +179,6 @@ ylabel('Probability')
 %% Run Analysis Method
 %.. In-plane demand parameter (test)
 Eta = CustomPoisPdf(0:Xmax, p_drift);
-% Eta = [0.2207
-%     0.5372
-%     0.1839
-%     0.0439
-%     0.0108
-%     0.0026
-%     0.0006
-%     0.0002
-%     0.0000
-%     0.0000
-%     0.0000
-%     0.0000];
 
 %.. Method 1
 disp('Time Based Method:')

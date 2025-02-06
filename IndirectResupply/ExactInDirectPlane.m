@@ -2,7 +2,7 @@
 % Compute Exact State Distrubution of InPlane Orbit Spares under InDirect Resupply Method
 %
 % Input
-% f_mc: failure rate per unit time step
+% f_sim: failure rate of simulation (reference)
 % f_type: failure type
 % n_sat: # of nominal satellite
 % kappa: Parking orbit spare availability probability distribution

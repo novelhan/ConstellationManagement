@@ -1,4 +1,4 @@
-% This script vaildates the analysis method of in-plane orbit under indirect spare management strategy.
+% This script vaildates the analysis method of in-plane orbit under the indirect spare management strategy.
 % Proposed Markov Chain analysis results are compared with the Monte Carlo simulation results.
 
 close all
@@ -23,7 +23,7 @@ dt_mc       =   dt_sim;             % [day]
 dt_plane    =   20;     % [day]
 cnt_plane   =   round(dt_plane/dt_sim);
 
-%.. Failure rate (test parameter, the demand distribution is not Poisson)
+%.. Failure rate (test parameter)
 p_fail  =   0.05/365; % [#/day] 0.05, 0.1, 0.15
 p_sim   =   p_fail * dt_sim;    % [#/dt_sim]
 
