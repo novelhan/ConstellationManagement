@@ -1,4 +1,4 @@
-% This script vaildates the analysis method of indirect spare management strategy.
+% This script vaildates the analysis method of hybrid spare management strategy.
 % Proposed Markov Chain analysis results are compared with the Monte Carlo simulation results.
 % (!!) This script assumes ideal configuration for in-plane and parking orbits
 % (!!) Test under given Tpark and Tplane (then corresponding orbital elements should be found later)
@@ -12,6 +12,7 @@ mfilepath = pwd;
 idcs = strfind(mfilepath,'\');
 libdir = mfilepath(1:idcs(end));
 addpath([libdir, 'CommonSource'])
+addpath([libdir, 'IndirectResupply'])
 
 %% Test Param
 rng('default')
@@ -19,7 +20,7 @@ iter_max    =   2;
 
 %.. Sim time
 dt_sim      =   1;                      % [day]
-time_sim    =   0:dt_sim:365*100;
+time_sim    =   0:dt_sim:365*1000;
 
 %.. Constellation Parameters
 n_plane     =   40;                     % The number of orbital planes for constellation
@@ -38,10 +39,15 @@ dt_drift    =   round(a_park/W_RAAN);                % [day]
 cnt_drift   =   round(dt_drift/dt_sim);
 n_drift     =   floor(length(time_sim)/cnt_drift);
 
-%.. LV Lead Time
-mu_lv       =   60;
-dt_lv       =   30;                % [day]
-cnt_lv      =   round(dt_lv/dt_sim);
+%.. Indirect LV Parameters (goes to parking orbit)
+mu_lv_park      =   60;
+dt_lv_park      =   30;                % [day]
+cnt_lv_park     =   round(dt_lv_park/dt_sim);
+
+%.. Direct LV Parameters (goes to in-plane orbit)
+mu_lv_plane     =   30;
+dt_lv_plane     =   15;                % [day]
+cnt_lv_plane    =   round(dt_lv_plane/dt_sim);
 
 %.. Failure rate 
 %!! If failure rate >> resupply speed -> the method will give poor result
@@ -49,23 +55,28 @@ p_fail      =   0.1/365;            % [#/day]
 p_sim       =   p_fail * dt_sim;    % [#/dt_sim]
 p_type      =   0; % 0 for const, 1 for state dependant
 
-%.. In-Plane (Q,R) Policy Parameter
-Qi      =   4;
-Ri      =   n_sat + 2;
+%.. Hybrid In-plane (Q1,R1,Q2,R2) Policy Parameter
+Qi1     =   4;
+Ri1     =   38;
+Qi2     =   3;
+Ri2     =   35;
 
 %.. Parking (Q,R) Policy Parameter
 kq      =   8;
 kr      =   7;
-Qp      =   Qi*kq;
-Rp      =   Qi*kr;
+Qp      =   Qi1*kq;
+Rp      =   Qi1*kr;
 
 %.. State Parameter
-Xi_max = Qi + Ri; % Max State Level of in-plane
+Xi_max = Qi1 + Qi2 + max(Ri1, Ri2); % Max State Level of in-plane
 Xi_num = 0:1:Xi_max; % State Counts
 Xp_max = kr + kq; % Max State Level of parking
 Xp_num = 0:1:Xp_max; % State Counts
-Di_max = ceil(Xi_max/Qi);
-Lv_max = ceil((dt_lv + mu_lv + 5*mu_lv)/dt_sim); % Max Lead Time Bin (mean + 5*sigma) [dt_sim]
+Di_max = ceil(Xi_max/Qi1);
+
+% Max Lead Time Bin (mean + 5*sigma) [dt_sim]
+LVp_max = ceil((dt_lv_park + mu_lv_park + 5*mu_lv_park)/dt_sim); 
+LVi_max = ceil((dt_lv_plane + mu_lv_plane + 5*mu_lv_plane)/dt_sim); 
 
 %% Simulation Result Save
 % The number of availalbe stock at each time step / histogram
@@ -75,11 +86,13 @@ Xi_on   =   zeros(Xi_max+1, n_plane, iter_max);
 Xp_on   =   zeros(Xp_max+1, n_park, iter_max);
 
 % The histogram of the number of stock right after the resupply moment
-Xi_q    =   zeros(Xi_max+1, n_plane, iter_max);
+Xi_q1   =   zeros(Xi_max+1, n_plane, iter_max);
+Xi_q2   =   zeros(Xi_max+1, n_plane, iter_max);
 Xp_q    =   zeros(Xp_max+1, n_park, iter_max);
 
 % The histogram of the number of stock at the reordering moment
-Xi_r    =   zeros(Xi_max+1, n_plane, iter_max);
+Xi_r1   =   zeros(Xi_max+1, n_plane, iter_max);
+Xi_r2   =   zeros(Xi_max+1, n_plane, iter_max);
 Xp_r    =   zeros(Xp_max+1, n_park, iter_max);
 
 % The histogram of the number of demand stock at the reordering moment
@@ -90,13 +103,15 @@ Xi_av = zeros(Di_max+1, Di_max+1, n_plane, iter_max); % dmd, sup, plane, iter
 Xp_av = zeros(Di_max+1, Di_max+1, n_park, iter_max); % dmd, sup, park, iter
 
 % The histogram of the number of launch vehicle
+Xi_lv = zeros(n_plane, iter_max);
 Xp_lv = zeros(n_park, iter_max); 
-
 
 %% Run Each Simulation
 for itr = 1:iter_max
+    disp(['Iter: ', num2str(itr)])
+    
     % The number of satellite at current time step
-    Ni_on_k   =   (Ri + round(Qi*rand(1,n_plane)));
+    Ni_on_k   =   (Ri1 + round(Qi1*rand(1,n_plane)));
     Np_on_k   =   kr+round(kq*rand(1,n_park));
 
     % Generate Future Contact Momment
@@ -117,10 +132,14 @@ for itr = 1:iter_max
     end
 
     % Set LV Launch Flag (-1 for ready for launch)
-    Lv_on = -ones(1,n_park);
+    LVi_on = -ones(1,n_plane);
+    LVp_on = -ones(1,n_park);
 
     % Apply Policy
     for k = 1:length(time_sim)
+        % Order of simulation
+        % In-Plane: Failure -> Check Qi2 arrival -> Apply (Qi1,Ri1) -> Check Ri2
+        % Parking: Check Qp arrival -> Demand Distribution -> Check Rp
 
         %%% 1. Generate Sample of In-Plane Failure at Every Time Step
         for i = 1:n_plane
@@ -138,22 +157,38 @@ for itr = 1:iter_max
             Ni_on_k(i) = max([Ni_on_k(i) - N_fail, 0]);
         end
 
-        %%% 2. Check Parking Resupply Arrival
+        %%% 2-1. Check Parking Resupply Arrival
         for j = 1:n_park
-            if Lv_on(j) == 0 % Resupply has arrived
-                % Update Non and Xq
+            if LVp_on(j) == 0 % Resupply has arrived
+                % Update Non and Xp_q
                 Np_on_k(j) = Np_on_k(j) + kq;
                 Xp_q(Np_on_k(j)+1,j,itr) = Xp_q(Np_on_k(j)+1,j,itr) + 1;
 
                 % Update LV Parameters
-                Lv_on(j) = -1;
+                LVp_on(j) = -1;
                 Xp_lv(j,itr) = Xp_lv(j,itr) + 1;
 
-            elseif Lv_on(j) > 0 % Wait for arrival
-                Lv_on(j) = Lv_on(j) - 1;
+            elseif LVp_on(j) > 0 % Wait for arrival
+                LVp_on(j) = LVp_on(j) - 1;
             end
         end
 
+        %%% 2-2. Check In-Plane Direct Resupply Arrival
+        for i = 1:n_plane
+            if LVi_on(i) == 0 % Resupply has arrived
+                % Update Non and Xi_q2
+                Ni_on_k(i) = Ni_on_k(i) + Qi2;
+                Xi_q2(Ni_on_k(i)+1,i,itr) = Xi_q2(Ni_on_k(i)+1,i,itr) + 1;
+
+                % Update LV Parameters
+                LVi_on(i) = -1;
+                Xi_lv(i,itr) = Xi_lv(i,itr) + 1;
+
+            elseif LVi_on(i) > 0 % Wait for arrival
+                LVi_on(i) = LVi_on(i) - 1;
+            end
+        end
+        
         %%% 3. Check In-Orbit Spare Transfer
         for j = 1:n_park
             if v_park2plane(j,k) ~= 0 % RAAN Contact Moment
@@ -161,19 +196,19 @@ for itr = 1:iter_max
                 i = v_park2plane(j,k);
 
                 % Demand
-                n_dmd = ceil( (Ri + 1 - Ni_on_k(i))/Qi ); % Required # of batch for ith in-plane
+                n_dmd = ceil( (Ri1 + 1 - Ni_on_k(i))/Qi1 ); % Required # of batch for ith in-plane
                 n_av = Np_on_k(j); % # of available batch for jth parking
                 n_trn = min(n_dmd, n_av); % # of transfered batch for jth park -> ith in-plane
 
                 % Update Xi_r
-                Xi_r(Ni_on_k(i)+1,i,itr) = Xi_r(Ni_on_k(i)+1,i,itr) + 1;
+                Xi_r1(Ni_on_k(i)+1,i,itr) = Xi_r1(Ni_on_k(i)+1,i,itr) + 1;
 
                 % Update Sat
-                Ni_on_k(i) = Ni_on_k(i) + Qi*n_trn;
+                Ni_on_k(i) = Ni_on_k(i) + Qi1*n_trn;
                 Np_on_k(j) = Np_on_k(j) - n_trn;
 
-                % Update Xi_q
-                Xi_q(Ni_on_k(i)+1,i,itr) = Xi_q(Ni_on_k(i)+1,i,itr) + 1;
+                % Update Xi_q1
+                Xi_q1(Ni_on_k(i)+1,i,itr) = Xi_q1(Ni_on_k(i)+1,i,itr) + 1;
                 Xi_dmd(n_dmd+1,i,itr) = Xi_dmd(n_dmd+1,i,itr) + 1;
                 
                 % Update Demand and actual transfer stock
@@ -182,25 +217,45 @@ for itr = 1:iter_max
             end
         end
 
-        %%% 4. Check Parking Reorder
+        %%% 4-1. Check Parking Reorder
         for j = 1:n_park
-            % LV must be available, RAAN Contact Moment, # of spares < kr 
-%             if Lv_on(j) == -1 && v_park2plane(j,k) ~= 0 && Np_on_k(j) <= kr % Will save time (If we use Q >= R)
-            if Lv_on(j) == -1 && Np_on_k(j) <= kr
+            % LVp must be available, RAAN Contact Moment, # of spares < kr 
+%             if LVp_on(j) == -1 && v_park2plane(j,k) ~= 0 && Np_on_k(j) <= kr % Will save time (If we use Q >= R)
+            if LVp_on(j) == -1 && Np_on_k(j) <= kr
                 % Sample Lead Time and Save
-                t_Lv = dt_lv + CustomExpRnd(mu_lv,1);
-                Lv_on(j) = ceil( t_Lv/dt_sim );
+                t_Lv = dt_lv_park + CustomExpRnd(mu_lv_park,1);
+                LVp_on(j) = ceil( t_Lv/dt_sim );
                 
                 % Update Xp_lv
                 Xp_lv(j,itr) = Xp_lv(j,itr) + 1;
 
-                % Update Xr
+                % Update Xp_r
                 Xp_r(Np_on_k(j)+1,j,itr) = Xp_r(Np_on_k(j)+1,j,itr) + 1; % +1 for index
                 
                 % Save Remaining time step before arrival
-                Lv_on(j) = Lv_on(j) - 1;
+                LVp_on(j) = LVp_on(j) - 1;
             end
         end
+        
+        %%% 4-2. Check In-plane Direct Reorder
+        for i = 1:n_plane
+            % LVi must be available, # of spares < kr 
+            if LVi_on(i) == -1 && Ni_on_k(i) <= kr
+                % Sample Lead Time and Save
+                t_Lv = dt_lv_plane + CustomExpRnd(mu_lv_plane,1);
+                LVi_on(i) = ceil( t_Lv/dt_sim );
+                
+                % Update Xp_lv
+                Xi_lv(i,itr) = Xi_lv(i,itr) + 1;
+
+                % Update Xi_r2
+                Xi_r2(Ni_on_k(i)+1,i) = Xi_r2(Ni_on_k(i)+1,i) + 1; % +1 for index
+                
+                % Save Remaining time step before arrival
+                LVi_on(i) = LVi_on(i) - 1;
+            end
+        end
+        
 
         % Save Stock Profile
         Ni_on(k,:,itr) = Ni_on_k;
@@ -214,7 +269,6 @@ for itr = 1:iter_max
         
     end
 end
-
 
 %% Plot Simulation Result
 close all
@@ -249,7 +303,7 @@ for i = 1:n_plane
 end
 
 figure(31); hold on
-for i = Ri-5:Xi_max
+for i = Ri1-5:Xi_max
     plot(i,Pi_on(i+1,:),'k*')
     plot(i,mean(Pi_on(i+1,:)),'ro','MarkerFaceColor','r')
 end
@@ -289,36 +343,55 @@ histogram('BinEdges', dmd_edge, 'BinCounts', sum(Xi_dmd,2),'Normalization','prob
 xlabel('Number of batch demanded from in-plane orbits')
 ylabel('Probability')
 
-
 %% Run Analysis Method
 %.. Marcov Chain Period
 dt_mc       =   dt_sim;                 % [day]
 
 %.. InPlane Parameter
-ParaInPlane.Q = Qi;
-ParaInPlane.R = Ri;
-ParaInPlane.n_sat = n_sat;
-ParaInPlane.dt_mc = dt_mc;
-ParaInPlane.dt_plane = dt_drift;
-ParaInPlane.f_sim = p_fail;
-ParaInPlane.f_type = p_type;
+ParaFail.dt_mc = dt_mc;
+ParaFail.f_ref = p_fail;
+ParaFail.f_type = p_type;
+ParaFail.n_sat = n_sat;
+
+%.. Direct Resupply Parameter
+ParaDirect.mu = mu_lv_plane;
+ParaDirect.dt_lv = dt_lv_plane;
+ParaDirect.Q2 = Qi2;
+ParaDirect.R2 = Ri2;
+
+%.. Indirect Resupply Parameter
+ParaIndirect.dt_plane = dt_drift;
+ParaIndirect.kappa = ones(Di_max+1,1);
+ParaIndirect.Q1 = Qi1;
+ParaIndirect.R1 = Ri1;
+
+%.. Full state result
+ParaDim.flag = 0;
+ParaDim.x_min = min(Ri1,Ri2) - ceil((3*p_fail*n_sat)*(dt_lv_plane + 2*mu_lv_plane));
+ParaDim.n_seg = round( (dt_lv_plane/dt_mc - 1)/3 );
+
+ParaInPlane.ParaFail = ParaFail;
+ParaInPlane.ParaDirect = ParaDirect;
+ParaInPlane.ParaIndirect = ParaIndirect;
+ParaInPlane.ParaDim = ParaDim;
 
 %.. Parking Parameter
 ParaParking.Q = kq;
 ParaParking.R = kr;
 ParaParking.dt_mc = dt_mc;
 ParaParking.dt_park = dt_contact;
-ParaParking.dt_lv = dt_lv;
-ParaParking.mu_lv = mu_lv;
-ParaParking.method = 0;
+ParaParking.dt_lv = dt_lv_park;
+ParaParking.mu_lv = mu_lv_park;
+ParaParking.method = 1;
 
-[PI_i, PI_p, T_i, T_p, err] = ExactInDirectProb(100, ParaInPlane, ParaParking);
+[PI_i, PI_p, T_i, T_p, err] = HybridProb(100, ParaInPlane, ParaParking);
 
-xx_i = length(PI_i.pi_ir)-1:-1:0;
+pi_hr = mean(PI_i.pi_hr,2);
+xx_i = length(pi_hr)-1:-1:0;
 xx_p = length(PI_p.pi_ir)-1:-1:0;
 
 figure(3); hold on
-plot(xx_i(1:13), PI_i.pi_ir(1:13), 'r*')
+plot(xx_i(1:13), pi_hr(1:13), 'r*')
 xlim([xx_i(13)-0.5, xx_i(1)+0.5])
 legend('Sim.', 'Sol.', 'location', 'best')
 
@@ -338,12 +411,12 @@ plot(xx_p, PI_p.pi_r, 'r*')
 legend('Sim.', 'Sol.', 'location', 'best')
 
 figure(44); hold on
-plot(0:Di_max-1, PI_i.pi_dmd, 'r*')
+plot(0:length(PI_i.pi_dmd)-1, PI_i.pi_dmd, 'r*')
 % xlim([xx_p(13)-0.5, xx_p(1)+0.5])
 legend('Sim.', 'Sol.', 'location', 'best')
 
 figure(31)
-plot(xx_i(1:10), PI_i.pi_ir(1:10), 'yo', 'MarkerFaceColor','y')
+plot(xx_i(1:13), pi_hr(1:13), 'yo', 'MarkerFaceColor','y')
 h = zeros(3, 1);
 h(1) = plot(nan,'k*');
 h(2) = plot(nan,'ro', 'MarkerFaceColor','r');

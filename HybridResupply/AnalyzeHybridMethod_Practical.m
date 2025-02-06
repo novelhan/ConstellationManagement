@@ -16,7 +16,7 @@ addpath([libdir, 'CommonSource'])
 x = [10.0000   39.0000    2.0000         0    6.0000  500.3649];
 %% Test Param
 % rng('default')
-iter_max    =   2;
+iter_max    =   10;
 
 %.. Sim time
 dt_sim      =   1;                  % [day]
@@ -200,12 +200,12 @@ for itr = 1:iter_max
                 i = v_park2plane(j,k);
 
                 % Demand
-                n_dmd = ceil( (Ri + 1 - Ni_on_k(i))/Qi ); % Required # of batch for ith in-plane
-                n_av = Np_on_k(j); % # of available batch for jth parking
-                n_trn = min(n_dmd, n_av); % # of transfered batch for jth park -> ith in-plane
+                n_dmd = ceil( (Ri + 1 - Ni_on_k(i))/Qi );
+                n_av = Np_on_k(j);
+                n_trn = min(n_dmd, n_av);
 
                 % Update Xi_r
-                Xi_r(Ni_on_k(i)+1,i,itr) = Xi_r(Ni_on_k(i)+1,i,itr) + 1;
+                Xi_q(Ni_on_k(i)+1,i,itr) = Xi_q(Ni_on_k(i)+1,i,itr) + 1;
 
                 % Update Sat
                 Ni_on_k(i) = Ni_on_k(i) + Qi*n_trn;
@@ -234,7 +234,7 @@ for itr = 1:iter_max
                 Xp_lv(j,itr) = Xp_lv(j,itr) + 1;
 
                 % Update Xr
-                Xp_r(Np_on_k(j)+1,j,itr) = Xp_r(Np_on_k(j)+1,j,itr) + 1; % +1 for index
+                Xp_r(Np_on_k(j)+1,j) = Xp_r(Np_on_k(j)+1,j) + 1; % +1 for index
                 
                 % Save Remaining time step before arrival
                 Lv_on(j) = Lv_on(j) - 1;
@@ -325,7 +325,7 @@ ylabel('Probability')
 
 figure(44); hold on
 histogram('BinEdges', dmd_edge, 'BinCounts', sum(Xi_dmd,2),'Normalization','probability')
-xlabel('Number of batch demanded from in-plane orbits')
+xlabel('Number of parking stock for entire period')
 ylabel('Probability')
 
 

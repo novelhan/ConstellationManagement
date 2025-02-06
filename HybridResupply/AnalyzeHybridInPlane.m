@@ -18,7 +18,7 @@ dt_sim      =   1;                  % [day]
 time_sim    =   0:dt_sim:365*10000;
 
 %.. Marcov Chain Period
-dt_mc       =   1.5;             % [day]
+dt_mc       =   1;             % [day]
 
 %.. In-plane Period (Time duration of in-plane for subsequent parking contact, RAAN Drift time)
 dt_plane   =   40;                 % [day]
@@ -230,9 +230,12 @@ end
 xlabel('Count after contact with parking orbit')
 ylabel('Prob. of pi_q2 over time')
 
+disp('Ratio between Q1 review period and Q2 order period is:')
+disp(['Sim Result: ', num2str(sum(Xlv)/sum(Xq1))])
+
 %% Run Analysis Code
 ParaFail.dt_mc = dt_mc;
-ParaFail.f_sim = p_sim;
+ParaFail.f_ref = p_fail;
 ParaFail.f_type = p_type;
 ParaFail.n_sat = n_sat;
 
@@ -252,9 +255,11 @@ ParaIndirect.R1 = R1;
 ParaDim.flag = 0;
 tic
 for i = 1:20
-[x, PI] = ExactDualInPlane(ParaFail, ParaDirect, ParaIndirect, ParaDim);
+[x, PI, T] = HybridInPlane(ParaFail, ParaDirect, ParaIndirect, ParaDim);
 end
 toc
+disp(['Full Result: ', num2str(T.T_q1/T.T_q2)])
+
 s = 'r*';
 figure(2); hold on
 plot(x, mean(PI.pi_hr,2), s)
@@ -295,9 +300,10 @@ ParaDim.x_min = min(R1,R2) - ceil((3*p_sim*n_sat)*(dt_LV + 2*mu_LV)); % 2 sigma 
 ParaDim.n_seg = round( (dt_LV/dt_mc - 1)/3 );
 tic
 for i = 1:20
-[x, PI] = ExactDualInPlane(ParaFail, ParaDirect, ParaIndirect, ParaDim);
+[x, PI, T] = HybridInPlane(ParaFail, ParaDirect, ParaIndirect, ParaDim);
 end
 toc
+disp(['Reduced Result: ', num2str(T.T_q1/T.T_q2)])
 s = 'mx';
 figure(2); hold on
 plot(x, mean(PI.pi_hr,2), s)

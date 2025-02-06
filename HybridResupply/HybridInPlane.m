@@ -4,7 +4,7 @@
 % Input
 % ParaFail: Failure Related Input Strcture
 %   dt_mc: unit time step
-%   f_sim: failure rate of simulation (reference)
+%   f_ref: failure rate per day (reference)
 %   f_type: failure type
 %   n_sat: # of nominal satellite
 %
@@ -33,10 +33,10 @@
 % Reference
 %
 
-function [x, PI] = ExactDualInPlane(ParaFail, ParaDirect, ParaIndirect, ParaDim)
+function [x, PI, T] = HybridInPlane(ParaFail, ParaDirect, ParaIndirect, ParaDim)
     %.. Failure Parameter
     dt_mc = ParaFail.dt_mc;
-    f_mc = ParaFail.f_sim * dt_mc;
+    f_mc = ParaFail.f_ref * dt_mc;
     f_type = ParaFail.f_type;
     n_sat = ParaFail.n_sat;
     
@@ -219,6 +219,7 @@ function [x, PI] = ExactDualInPlane(ParaFail, ParaDirect, ParaIndirect, ParaDim)
     % Prob. Dsit for Direct Resupply
     PI_q2 = zeros(nx,c_plane);
     PI_r2 = zeros(nx,c_plane);
+    PI_tp = zeros(nx,c_plane);
     PI_np = PI_hr(         1:1*nx,:); % pi_np
     PI_wp = PI_hr((L-1)*nx+1:L*nx,:); % pi_wp
     
@@ -230,10 +231,25 @@ function [x, PI] = ExactDualInPlane(ParaFail, ParaDirect, ParaIndirect, ParaDim)
             PI_q2(:,i) = rho*Pq2*Pf*PI_wp(:,i-1); 
             PI_r2(:,i) = Cm*Pf*PI_np(:,i-1) + rho*Cm*Pq2*Pf*PI_wp(:,i-1); 
         end
-        
+        PI_tp(:,i) = sum(reshape(PI_hr(nx+1:(L-1)*nx,i),nx,[]),2);
     end
     pi_q2 = sum(PI_q2,2)/sum(sum(PI_q2,2));
     pi_r2 = sum(PI_r2,2)/sum(sum(PI_r2,2));
+    
+    %
+    a_np = sum(mean(PI_np,2));
+    a_wp = sum(mean(PI_wp,2));
+    a_tp = sum(mean(PI_tp,2))/(c_lv-1)*c_lv; % Only k_lv - 1 terms are considered for the states
+    
+    %.. Reorder period
+    T_q1 = c_plane*dt_mc; % Q1 review period
+    T_tp = c_lv*dt_mc;
+    T_np = a_np/a_tp*T_tp;
+    T_wp = a_wp/a_tp*T_tp;
+    T_q2 = T_np + T_tp + T_wp; % Q2 review period
+    
+    T.T_q1 = T_q1;
+    T.T_q2 = T_q2;
     
     %.. Normalization
     for i = 1:c_plane
@@ -253,4 +269,6 @@ function [x, PI] = ExactDualInPlane(ParaFail, ParaDirect, ParaIndirect, ParaDim)
     PI.PI_r2 = PI_r2;
     PI.pi_q2 = pi_q2;
     PI.pi_r2 = pi_r2;
+    
+    
 end
