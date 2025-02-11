@@ -31,9 +31,8 @@ ParaInPlane.dt_mc = dt_mc;
 ParaParking.dt_mc = dt_mc;
 
 %.. Failure rate
-% 0.05, 0.1, 0.2
 f_fail = 0.1/365; % [#/day]
-f_type = 1; % 0:Const, 1:State-Dependant
+f_type = 1; % 0:Constant failure, 1:State Dependent failure
 
 %.. Constellation Orbit Parameters (Given)
 N_plane     =   40;                     % The number of orbital planes for constellation
@@ -113,11 +112,12 @@ hp_max = 1000;
 LB = [Qi1_min, Ri_min, Qp_min, Rp_min, Np_min, hp_min];
 UB = [Qi1_max, Ri_max, Qp_park_max, Rp_max, Np_max, hp_max];
 
-%.. Integer Index
+%.. Integer Index and Opt Option
 intcon = [1 2 3 4 5];
-
 opts = optimoptions('ga','MaxStallGenerations',50,'FunctionTolerance',1e-10,...
                     'MaxGenerations',500,'PopulationSize',200,'Display','iter');
+
+%.. Run Opt
 rng default % For reproducibility
 x_opt = ga(@(x) CostFun(x, ParaCost, ParaInPlane, ParaParking), 6, [], [], [], [], LB, UB,...
            @(x) ConstFun(x, ParaConst, ParaInPlane, ParaParking), intcon, opts);
