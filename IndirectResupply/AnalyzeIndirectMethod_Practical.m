@@ -200,7 +200,7 @@ for itr = 1:iter_max
                 i = v_park2plane(j,k);
 
                 % Demand
-                n_dmd = ceil( (Ri + 1 - Ni_on_k(i))/Qi ); % Required # of batch for ith in-plane
+                n_dmd = max(ceil( (Ri + 1 - Ni_on_k(i))/Qi ), 0); % Required # of batch for ith in-plane
                 n_av = Np_on_k(j); % # of available batch for jth parking
                 n_trn = min(n_dmd, n_av); % # of transfered batch for jth park -> ith in-plane
 

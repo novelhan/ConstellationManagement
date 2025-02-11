@@ -19,8 +19,6 @@
 % err: residual history of fixed point iteration
 %
 % Reference
-% Analysis and Design of Satellite Constellation Spare Strategy Using Markov Chain
-% https://doi.org/10.48550/arXiv.2408.09250
 
 
 function [PI_i, PI_p, T_i, T_p, err] = HybridProb(iter_max, ParaInPlane, ParaParking)
@@ -55,7 +53,7 @@ function [PI_i, PI_p, T_i, T_p, err] = HybridProb(iter_max, ParaInPlane, ParaPar
         xx = [mean(PI_i.pi_hr,2); PI_p.pi_ir];
         err(iter) = norm(xx - xx_pre);
 %         disp(['Iteration:', num2str(iter), ',  Error:', num2str(err(iter))])
-        if err(iter) < 10^(-5)
+        if err(iter) < 10^(-7)
             err = err(1:iter);
             break;
         else

@@ -14,7 +14,7 @@ addpath([libdir, 'CommonSource'])
 %% Test Param
 %.. Sim time
 dt_sim = 1; % [day]
-time_sim = 0:dt_sim:365*1000;
+time_sim = 0:dt_sim:365*10000;
 
 %.. Marcov Chain Period
 dt_mc = dt_sim;  % [day]

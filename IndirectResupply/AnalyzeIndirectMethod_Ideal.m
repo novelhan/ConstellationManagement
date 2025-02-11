@@ -14,12 +14,12 @@ libdir = mfilepath(1:idcs(end));
 addpath([libdir, 'CommonSource'])
 
 %% Test Param
-rng('default')
-iter_max    =   2;
+% rng('default')
+iter_max    =   1;
 
 %.. Sim time
-dt_sim      =   1;                      % [day]
-time_sim    =   0:dt_sim:365*100;
+dt_sim      =   3;                      % [day]
+time_sim    =   0:dt_sim:365*500;
 
 %.. Constellation Parameters
 n_plane     =   40;                     % The number of orbital planes for constellation
@@ -45,7 +45,7 @@ cnt_lv      =   round(dt_lv/dt_sim);
 
 %.. Failure rate 
 %!! If failure rate >> resupply speed -> the method will give poor result
-p_fail      =   0.1/365;            % [#/day]
+p_fail      =   0.2/365;            % [#/day]
 p_sim       =   p_fail * dt_sim;    % [#/dt_sim]
 p_type      =   0; % 0 for const, 1 for state dependant
 
@@ -95,6 +95,8 @@ Xp_lv = zeros(n_park, iter_max);
 
 %% Run Each Simulation
 for itr = 1:iter_max
+    disp(['Iter: ', num2str(itr)])
+    
     % The number of satellite at current time step
     Ni_on_k   =   (Ri + round(Qi*rand(1,n_plane)));
     Np_on_k   =   kr+round(kq*rand(1,n_park));
@@ -161,7 +163,7 @@ for itr = 1:iter_max
                 i = v_park2plane(j,k);
 
                 % Demand
-                n_dmd = ceil( (Ri + 1 - Ni_on_k(i))/Qi ); % Required # of batch for ith in-plane
+                n_dmd = max(ceil( (Ri + 1 - Ni_on_k(i))/Qi ), 0); % Required # of batch for ith in-plane
                 n_av = Np_on_k(j); % # of available batch for jth parking
                 n_trn = min(n_dmd, n_av); % # of transfered batch for jth park -> ith in-plane
 
@@ -310,7 +312,7 @@ ParaParking.dt_mc = dt_mc;
 ParaParking.dt_park = dt_contact;
 ParaParking.dt_lv = dt_lv;
 ParaParking.mu_lv = mu_lv;
-ParaParking.method = 0;
+ParaParking.method = 1;
 
 [PI_i, PI_p, T_i, T_p, err] = ExactInDirectProb(100, ParaInPlane, ParaParking);
 
@@ -362,3 +364,8 @@ figure(5)
 plot(1:length(err), log10(err), '-o')
 xlabel('Iterations')
 ylabel('log_{10} of relative error')
+
+% diag(sum(sum(Xp_av,4),3))'./(sum(sum(sum(Xp_av,4),3))+0.0001)
+% PI_p.Pdav
+
+abs(mean(mean(sum(Ni_on,3))) - xx_i*PI_i.pi_ir)/(xx_i*PI_i.pi_ir)*100

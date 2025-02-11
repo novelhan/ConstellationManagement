@@ -13,19 +13,22 @@ addpath([libdir, 'CommonSource'])
 
 
 %% Test Param
+rng('default')
+iter_max = 5; % Number of different initial condition
+
 %.. Sim time
 dt_sim      =   1;                  % [day]
-time_sim    =   0:dt_sim:365*10000;
+time_sim    =   0:dt_sim:365*1000;
 
 %.. Marcov Chain Period
 dt_mc       =   1;             % [day]
 
 %.. In-plane Period (Time duration of in-plane for subsequent parking contact, RAAN Drift time)
-dt_plane   =   40;                 % [day]
+dt_plane   =   60;                 % [day]
 cnt_plane  =   round(dt_plane/dt_sim);
 
 %.. Failure rate (test parameter)
-p_fail  =   0.3/365; % [#/day] 0.05, 0.1, 0.15
+p_fail  =   0.4/365; % [#/day] 0.05, 0.1, 0.15
 p_sim   =   p_fail * dt_sim;    % [#/dt_sim]
 
 %.. Failure type
@@ -34,12 +37,12 @@ n_sat = 40; % Number of operating satellite per orbit for nominal condition
 
 %.. Hybrid In-plane (Q1,R1,Q2,R2) Policy Parameter
 Q1  =   4;
-R1  =   35;
+R1  =   40;
 Q2  =   2;
-R2  =   38;
+R2  =   40;
 
 %.. State Parameter
-Xmax = Q1+Q2+R1; % Max State Level
+Xmax = Q1+Q2+max(R1,R2); % Max State Level
 Xnum = 0:1:Xmax; % State Counts
 
 %.. Parking Availablity (Test distribution)
@@ -51,15 +54,12 @@ Kappa = [1, 1 - Pav_sum(1:end-1)]; % Kappa(k): Pr. having more than k-1 batch of
 Nav = 0:1:Dmax; % Demand Count
 
 %.. Direct LV Parameters (Modeled as bias shifted exponential distribution)
-mu_LV   =   40;     % [day]
-dt_LV   =   20;
+mu_LV   =   30;     % [day]
+dt_LV   =   15;
 dTlv_max = ceil(dt_LV + mu_LV + 5*mu_LV); % Max Lead Time Bin (mean + 5*sigma) [day]
 dTlv = 1:dTlv_max; % Lead Time Bin (Minimum is set as dt_sim)
 
 %% (Q1, R1, Q2, R2) Policy
-rng('default')
-iter_max = 1; % Number of different initial condition
-
 % The number of availalbe stock at each time step / histogram
 Non = zeros(length(time_sim), iter_max);
 Xon = zeros(Xmax+1, iter_max);
@@ -218,20 +218,20 @@ end
 
 figure(8); hold on
 for m = 1:(R2+1)
-    plot(1:cnt_plane, Pbr2(m,:))
+    plot(1:cnt_plane, [Pbr2(m,2:end), Pbr2(m,1)])
 end
 xlabel('Count after contact with parking orbit')
-ylabel('Prob. of pi_r2 over time')
+ylabel('Prob. of \pi_{r2} over time')
 
 figure(9); hold on
 for m = 1:(Xmax+1)
     plot(1:cnt_plane, [Pbq2(m,2:end), Pbq2(m,1)])
 end
 xlabel('Count after contact with parking orbit')
-ylabel('Prob. of pi_q2 over time')
+ylabel('Prob. of \pi_{q2} over time')
 
 disp('Ratio between Q1 review period and Q2 order period is:')
-disp(['Sim Result: ', num2str(sum(Xlv)/sum(Xq1))])
+disp(['Sim Result: ', num2str(mean(sum(Xlv)./sum(Xq1)))])
 
 %% Run Analysis Code
 ParaFail.dt_mc = dt_mc;
@@ -283,20 +283,27 @@ figure(8); hold on
 set(gca,'ColorOrderIndex',1)
 PI_r2 = flip(PI.PI_r2);
 for m = 1:length(x)
-    plot((1:round(dt_plane/dt_mc))*dt_mc, PI_r2(m,:), 'o')
+    plot((1:round(dt_plane/dt_mc))*dt_mc, [PI_r2(m,2:end),PI_r2(m,1)], 'o')
 end
 
 PI_q2 = flip(PI.PI_q2);
 figure(9); hold on
 set(gca,'ColorOrderIndex',1)
 for m = 1:length(x)
-    plot((1:round(dt_plane/dt_mc))*dt_mc, PI_q2(m,:), 'o')
+    plot((1:round(dt_plane/dt_mc))*dt_mc, [PI_q2(m,2:end), PI_q2(m,1)], 'o')
 end
+
+figure(10); hold on
+set(gca,'ColorOrderIndex',1)
+for m = 1:10
+    plot((1:round(dt_plane/dt_mc))*dt_mc, PI.pi_hr(m,:), 'o')
+end
+
 
 
 %.. Reduced state result
 ParaDim.flag = 1;
-ParaDim.x_min = min(R1,R2) - ceil((3*p_sim*n_sat)*(dt_LV + 2*mu_LV)); % 2 sigma for both failure and lead time
+ParaDim.x_min = min(R1,R2) - ceil((2.5*p_sim*n_sat)*(dt_LV + 1.5*mu_LV)); % 2 sigma for both failure and lead time
 ParaDim.n_seg = round( (dt_LV/dt_mc - 1)/3 );
 tic
 for i = 1:20
@@ -336,14 +343,20 @@ set(gca,'ColorOrderIndex',1)
 PI_r2 = flip([PI.PI_r2; zeros(x(end),b)]);
 [a, ~] = size(PI_r2);
 for m = 1:a
-    plot((1:round(dt_plane/dt_mc))*dt_mc, PI_r2(m,:), 'x')
+    plot((1:round(dt_plane/dt_mc))*dt_mc, [PI_r2(m,2:end),PI_r2(m,1)], 'x')
 end
 
 PI_q2 = flip([PI.PI_q2; zeros(x(end),b)]);
 figure(9); hold on
 set(gca,'ColorOrderIndex',1)
 for m = 1:a
-    plot((1:round(dt_plane/dt_mc))*dt_mc, PI_q2(m,:), 'x')
+    plot((1:round(dt_plane/dt_mc))*dt_mc, [PI_q2(m,2:end), PI_q2(m,1)], 'x')
+end
+
+figure(10); hold on
+set(gca,'ColorOrderIndex',1)
+for m = 1:10
+    plot((1:round(dt_plane/dt_mc))*dt_mc, PI.pi_hr(m,:), 'x')
 end
 
 
