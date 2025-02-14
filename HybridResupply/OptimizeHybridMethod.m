@@ -53,8 +53,8 @@ dt_lv_plane     =   15;                % [day]
 
 %.. Cost Model
 c_build = 0.5; % Manufacturing cost per satellite [M$/sat]
-c_holding_plane = 0.5/365; % Holding cost per satellite in In-Plane orbit [M$/sat/day]
-c_holding_park = 0.5/365; %Holding cost per satellite in Parking orbit [M$/sat/day] [M$/sat/day]
+c_hold_plane = 0.5/365; % Holding cost per satellite in In-Plane orbit [M$/sat/day]
+c_hold_park = 0.5/365; %Holding cost per satellite in Parking orbit [M$/sat/day] [M$/sat/day]
 c_transfer = 0.5; % Risk and additional cost for indirect transfer [M$/batch]
 c_fuel = 0.001; % Fuel cost for indirect transfer [M$/batch]
 c_lv_plane_part = 3; %[M$/sat/launch] for direct LV
@@ -65,7 +65,8 @@ lv_plane_max_capa = 3; %[#sat] max capacitiy for direct LV
 lv_park_max_capa = 40; %[#sat] max capacitiy for indirect LV
 
 ParaCost.c_build = c_build;
-ParaCost.c_holding = c_holding_plane;
+ParaCost.c_hold_plane = c_hold_plane;
+ParaCost.c_hold_park = c_hold_park;
 ParaCost.c_lv_part = c_lv_park_part;
 ParaCost.lv_full_discount = lv_full_park_discount;
 ParaCost.Qmax = Qp_park_max;

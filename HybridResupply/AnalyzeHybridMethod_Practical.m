@@ -202,7 +202,6 @@ for itr = 1:iter_max
 
                 % Update LV Parameters
                 LVp_on(j) = -1;
-                Xp_lv(j,itr) = Xp_lv(j,itr) + 1;
 
             elseif LVp_on(j) > 0 % Wait for arrival
                 LVp_on(j) = LVp_on(j) - 1;

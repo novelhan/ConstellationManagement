@@ -13,21 +13,27 @@ function [Y] = CustomPoisRnd(p, m, n)
     %.. To boost the computation speed, we precompute the factorial
     persistent FACTORIAL
     if isempty(FACTORIAL)
-        FACTORIAL = [  1
-                       1
-                       2
-                       6
-                      24
-                     120
-                     720
-                    5040
-                   40320
-                  362880
-                 3628800
-                39916800
-               479001600
-              6227020800
-             87178291200];
+        FACTORIAL = [      1
+                           1
+                           2
+                           6
+                          24
+                         120
+                         720
+                        5040
+                       40320
+                      362880
+                     3628800
+                    39916800
+                   479001600
+                  6227020800
+                 87178291200
+               1307674368000
+              20922789888000
+             355687428096000
+            6402373705728000
+          121645100408832000
+         2432902008176640000];
     end
 
     % Input Handling
@@ -39,7 +45,7 @@ function [Y] = CustomPoisRnd(p, m, n)
     end
     
     % Compute Poisson CDF (consider upto mean + 10-sigma)
-    Zset = 0:1:ceil(11*p);
+    Zset = (0:1:ceil(11*p))';
 %     PDF = p.^Zset*exp(-p)./factorial(Zset); 
     PDF = p.^Zset*exp(-p)./FACTORIAL(Zset+1); 
     CDF = cumsum(PDF);

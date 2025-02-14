@@ -8,7 +8,7 @@ function [J, Cost] = CostDirectResupply(X, ParaCost, ParaInPlane)
     
     %.. Cost per unit time step for each different list
     C_build = DirectManufacturingCost(T.T_dr, ParaCost, ParaInPlane);
-    C_hold = DirectHoldingCost(PI.Xi, PI.pi_dr, ParaCost, ParaInPlane);
+    C_hold = DirectHoldingCost(PI.X, PI.pi_dr, ParaCost, ParaInPlane);
     C_launch = DirectLaunchCost(T.T_dr, ParaCost, ParaInPlane);
     
     %.. Total Cost

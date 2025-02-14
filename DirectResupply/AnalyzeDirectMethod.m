@@ -181,19 +181,19 @@ end
 toc 
 
 figure(2); hold on
-plot(PI1.Xi, PI1.pi_dr, 'r*')
+plot(PI1.X, PI1.pi_dr, 'r*')
 
 figure(3); hold on
-plot(PI1.Xi, PI1.pi_q, 'r*')
+plot(PI1.X, PI1.pi_q, 'r*')
 
 figure(4); hold on
-plot(PI1.Xi, PI1.pi_r, 'r*')
+plot(PI1.X, PI1.pi_r, 'r*')
 
 figure(5); hold on
-plot(PI1.Xi, PI1.pi_np, 'r*')
+plot(PI1.X, PI1.pi_np, 'r*')
 
 figure(6); hold on
-plot(PI1.Xi, PI1.pi_wp, 'r*')
+plot(PI1.X, PI1.pi_wp, 'r*')
 
 %.. Method 2
 disp('Ratio Based Method:')
@@ -205,23 +205,23 @@ end
 toc
 
 figure(2); hold on
-plot(PI2.Xi, PI2.pi_dr, 'go')
+plot(PI2.X, PI2.pi_dr, 'go')
 legend('Sim.', 'Sol.1', 'Sol.2', 'location', 'best')
 
 figure(3); hold on
-plot(PI2.Xi, PI2.pi_q, 'go')
+plot(PI2.X, PI2.pi_q, 'go')
 legend('Sim.', 'Sol.1', 'Sol.2', 'location', 'best')
 
 figure(4); hold on
-plot(PI2.Xi, PI2.pi_r, 'go')
+plot(PI2.X, PI2.pi_r, 'go')
 legend('Sim.', 'Sol.1', 'Sol.2', 'location', 'best')
 
 figure(5); hold on
-plot(PI2.Xi, PI2.pi_np, 'go')
+plot(PI2.X, PI2.pi_np, 'go')
 legend('Sim.', 'Sol.1', 'Sol.2', 'location', 'best')
 
 figure(6); hold on
-plot(PI2.Xi, PI2.pi_wp, 'go')
+plot(PI2.X, PI2.pi_wp, 'go')
 legend('Sim.', 'Sol.1', 'Sol.2', 'location', 'best')
 
 % dtxx = T0_LV+1:dTlv_max;
@@ -260,10 +260,10 @@ end
 disp(['P(Xi< N_sat): ',num2str(p_loss)])
 
 %.. Analysis result
-n_avg = sum(PI2.Xi.*PI2.pi_dr);
-idx = find(PI2.Xi == N_sat);
+n_avg = sum(PI2.X.*PI2.pi_dr);
+idx = find(PI2.X == N_sat);
 p_loss = sum(PI2.pi_dr(idx+1:end));
-n_spare = sum((PI2.Xi(1:idx-1)-N_sat).*PI2.pi_dr(1:idx-1));
+n_spare = sum((PI2.X(1:idx-1)-N_sat).*PI2.pi_dr(1:idx-1));
 
 disp(' ')
 disp('Analysis Results')

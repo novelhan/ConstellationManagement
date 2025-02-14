@@ -16,24 +16,21 @@ addpath([libdir, 'CommonSource'])
 dt_sim      =   1;                % [day]
 time_sim    =   0:dt_sim:365*1000;
 
-%.. Marcov Chain Period
-dt_mc       =   dt_sim;             % [day]
-
 %.. In-plane Period (Time duration of in-plane for subsequent parking contact, RAAN Drift time)
 dt_plane    =   20;     % [day]
 cnt_plane   =   round(dt_plane/dt_sim);
 
 %.. Failure rate (test parameter)
-p_fail  =   0.05/365; % [#/day] 0.05, 0.1, 0.15
-p_sim   =   p_fail * dt_sim;    % [#/dt_sim]
+f_ref = 0.25/365; % [#/day] 0.05, 0.1, 0.15
+f_sim = f_ref * dt_sim;    % [#/dt_sim]
 
 %.. Failure type
-p_type = 0; % 0:Constant failure, 1:State Dependent failure
-n_sat = 40; % Number of operating satellite per orbit for nominal condition
+f_type = 0; % 0:Constant failure, 1:State Dependent failure
+N_sat = 40; % Number of operating satellite per orbit for nominal condition
 
 %.. Indirect In-plane (Q,R) Policy Parameter
-Q       =   4;
-R       =   42;
+Q = 4;
+R = 42;
 
 %.. State Parameter
 Xmax = Q + R; % Max State Level
@@ -73,13 +70,13 @@ for iter = 1:iter_max
     % Apply Policy
     for i = 1:length(time_sim)
         % 1. Generate Fail Sample at Every Time Step
-        if p_type == 0 %.. Const Failure Rate
-            N_fail = CustomPoisRnd(n_sat*p_sim, 1);
+        if f_type == 0 %.. Const Failure Rate
+            N_fail = CustomPoisRnd(N_sat*f_sim, 1);
         else %.. State Dependant Failure Rate
-            if Non_k > n_sat
-                N_fail = CustomPoisRnd(n_sat*p_sim, 1);
+            if Non_k > N_sat
+                N_fail = CustomPoisRnd(N_sat*f_sim, 1);
             else
-                N_fail = CustomPoisRnd(Non_k*p_sim, 1);
+                N_fail = CustomPoisRnd(Non_k*f_sim, 1);
             end
         end
         
@@ -147,18 +144,26 @@ ylabel('Probability')
 
 
 %% Run Analysis Method
-[xx, PI, T] = ExactInDirectPlane(p_sim, p_type, n_sat, Kappa, Q, R, dt_mc, dt_plane);
+ParaInPlane.f_ref = f_ref;
+ParaInPlane.f_type = f_type;
+ParaInPlane.N_sat = N_sat;
+ParaInPlane.Q = Q;
+ParaInPlane.R = R;
+ParaInPlane.dt_mc = dt_sim;
+ParaInPlane.dt_plane = dt_plane;
+
+[PI, T] = SolveInDirectPlane(Kappa, ParaInPlane);
 
 figure(2); hold on
-plot(xx, PI.pi_ir, 'r*')
+plot(PI.X, PI.pi_avg, 'r*')
 legend('Sim.', 'Sol.', 'location', 'best')
 
 figure(3); hold on
-plot(xx, PI.pi_q, 'r*')
+plot(PI.X, PI.pi_q, 'r*')
 legend('Sim.', 'Sol.', 'location', 'best')
 
 figure(4); hold on
-plot(xx, PI.pi_r, 'r*')
+plot(PI.X, PI.pi_r, 'r*')
 legend('Sim.', 'Sol.', 'location', 'best')
 
 figure(5); hold on

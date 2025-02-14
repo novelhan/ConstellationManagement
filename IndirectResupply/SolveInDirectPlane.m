@@ -2,47 +2,60 @@
 % Compute Exact State Distrubution of InPlane Orbit Spares under InDirect Resupply Method
 %
 % Input
-% f_sim: failure rate of simulation (reference)
-% f_type: failure type
-% n_sat: # of nominal satellite
 % kappa: Parking orbit spare availability probability distribution
-% Q: Reorder quantity
-% R: Reorder level
-% dt_mc: unit time step
-% dt_plane: review period (duration unitl meet subsequent parking orbit)
+% ParaInPlane: In-Plane orbit parameter structure
+%   f_ref: failure rate per unit time step
+%   f_type: failure type
+%   N_sat: # of nominal satellite
+%   Q: Reorder quantity
+%   R: Reorder level
+%   dt_mc: unit time step
+%   dt_plane: review period (duration unitl meet subsequent parking orbit)
 %
 % Output
-% x: State vector of Markov Chain
 % PI: Set of Stationary State Distribution
+%   X: State vector of Markov Chain
+%   pi_avg: Prob. dist. for the entire cycle
+%   pi_q: Prob. dist. right after Q replenishment
+%   pi_r: Prob. dist. when reorder is made (when Xi = r)
+%   pi_dmd: Prob. dist. when reorder is made (when Xi = r)
 % T: Set of time duration for cycles
+%   T_avg: Avg. duration for full reorder cycle
 %
 % Reference
 % Analysis and Design of Satellite Constellation Spare Strategy Using Markov Chain
 % https://doi.org/10.48550/arXiv.2408.09250
 
 
-function [x, PI, T] = ExactInDirectPlane(f_sim, f_type, n_sat, kappa, Q, R, dt_mc, dt_plane)
+function [PI, T] = SolveInDirectPlane(kappa, ParaInPlane)
     %%% Step 1: Initialize the parameters
     %.. State
+    Q = ParaInPlane.Q;
+    R = ParaInPlane.R;
     xmax = Q + R; % Max State Level: bar(N_sat), p.10
     x = (xmax:-1:0)';
     nx = length(x); % Dimension of state distribution: bar(N_sat)+1
     
-
     %.. Constant reorder period
+    dt_mc = ParaInPlane.dt_mc;
+    dt_plane = ParaInPlane.dt_plane;
     k = round(dt_plane/dt_mc); % Eq.32
 
     %%% Step 2: Compute pi_q and pi_r
+    f_ref = ParaInPlane.f_ref;
+    f_type = ParaInPlane.f_type;
+    N_sat = ParaInPlane.N_sat;
+    
     %.. Failure Transition Matrix (Prq), Eqs.11~12
-    f_mc = f_sim*dt_mc; % Failure rate per unit time step
+    f_mc = f_ref*dt_mc; % Failure rate per unit time step
     I = eye(nx);
     Pf = zeros(nx);
     for i = 1:nx
         if f_type == 0 % Constant Failure Rate
-            Pf(i:end,i) = CustomPoisPdf(0:nx-i, n_sat*f_mc)';        
+            Pf(i:end,i) = CustomPoisPdf(0:nx-i, N_sat*f_mc)';        
         else % Stock Level Dependant Failure Rate
-            if (nx-i) > n_sat
-                Pf(i:end,i) = CustomPoisPdf(0:nx-i, n_sat*f_mc)';        
+            if (nx-i) > N_sat
+                Pf(i:end,i) = CustomPoisPdf(0:nx-i, N_sat*f_mc)';        
             else
                 Pf(i:end,i) = CustomPoisPdf(0:nx-i, (nx-i)*f_mc)';  
             end
@@ -92,7 +105,7 @@ function [x, PI, T] = ExactInDirectPlane(f_sim, f_type, n_sat, kappa, Q, R, dt_m
     pi_r = Prq*pi_q; % Prob. Dist right after RAAN Contact
     
     %%% Step 3: Compute pi_ir
-    %.. Demand Distributio, Eq.39
+    %.. Demand Distribution, Eq.39
     pi_bf = zeros(m*Q,1);
     pi_bf(1:nx) = pi_r; % Dim. m*Q x 1
     if Q == 1
@@ -108,15 +121,14 @@ function [x, PI, T] = ExactInDirectPlane(f_sim, f_type, n_sat, kappa, Q, R, dt_m
 %         A1 = A1 + Pf^i;
 %     end
     A1 = sum(Pf_set(:,:,1:k),3);
-    pi_ir = A1*pi_q/k;
+    pi_avg = A1*pi_q/k;
 
     %.. Output
-    PI.pi_ir = pi_ir;
+    PI.X = x;
+    PI.pi_avg = pi_avg;
     PI.pi_q = pi_q;
     PI.pi_r = pi_r;
     PI.pi_dmd = pi_dmd;
-    PI.Prq = Prq;
-    PI.Pqr = Pqr;
     
-    T.T_ir = k*dt_mc; % T_ir = T_plane = k*dt_mc
+    T.T_avg = k*dt_mc; % T_ir = T_plane = k*dt_mc
 end

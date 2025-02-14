@@ -13,33 +13,33 @@ idcs = strfind(mfilepath,'\');
 libdir = mfilepath(1:idcs(end));
 addpath([libdir, 'CommonSource'])
 
-x = [10.0000   39.0000    2.0000         0    6.0000  500.3649];
+%.. Global Constants
+global R_earth mu_earth J2_earth
+R_earth = 6400; % [km]
+mu_earth = 3.986 * 10^5; % [km^3/sec^2]
+J2_earth = 0.00108263;
+
+%.. Selected Design Parameters: [Qi, Ri, Qp, Rp, Npark, hpakr]
+x = [1.0000   41.0000   40.0000   10.0000    3.0000  530.4796];
+
 %% Test Param
 % rng('default')
-iter_max    =   2;
+iter_max    =   1;
 
 %.. Sim time
 dt_sim      =   1;                  % [day]
 time_sim    =   0:dt_sim:365*100;
 
-%.. Marcov Chain Period
-dt_mc       =   dt_sim/2;                 % [day]
-
 %.. Conversion Parameters
 R2D = 180/pi;   % Radian to Degree
 D2R = 1/R2D;
 
-%.. Earth Parameters
-R_earth     =   6400;
-mu_earth    =   3.986 * 10^5; 
-J2_earth    =   0.00108263;
-
 %.. Constellation Parameters
 N_plane     =   40;                     % The number of orbital planes for constellation
-N_park      =   x(5);                      % The number of parking planes for constellation
+N_park      =   x(5);                   % The number of parking planes for constellation
 N_sat       =   40;                     % The number of desigend satellites for each plane
 h_plane     =   1200;                   % Altitude of in-plane orbits [km]
-h_park      =   x(6);                    % Altitude of parking orbits [km]
+h_park      =   x(6);                   % Altitude of parking orbits [km]
 i_plane     =   50 * D2R;               % Inclination of in-plane orbits [rad]
 i_park      =   50 * D2R;               % Inclination of parking orbits [rad]
 
@@ -108,12 +108,14 @@ Xp_r    =   zeros(Xp_max+1, N_park, iter_max);
 % The histogram of the number of demand stock at the reordering moment
 Xi_dmd  =   zeros(Di_max+1, N_plane, iter_max);
 
-% The histogram of the number of available stock
-Xi_av = zeros(Di_max+1, Di_max+1, N_plane, iter_max); % dmd, sup, plane, iter
-Xp_av = zeros(Di_max+1, Di_max+1, N_park, iter_max); % dmd, sup, park, iter
+% The histogram of the number of transfered batch
+Xi_av   =   zeros(Di_max+1, Di_max+1, N_plane, iter_max); % dmd, sup, plane, iter
+Xp_av   =   zeros(Di_max+1, Di_max+1, N_park, iter_max); % dmd, sup, park, iter
+Xi_trn  =   zeros(Di_max+1, N_plane, iter_max);
+Xp_trn  =   zeros(Di_max+1, N_park, iter_max);
 
 % The histogram of the number of launch vehicle
-Xp_lv = zeros(N_park, iter_max); 
+Xp_lv   =   zeros(N_park, iter_max); 
 
 
 %% Run Each Simulation
@@ -186,7 +188,6 @@ for itr = 1:iter_max
 
                 % Update LV Parameters
                 Lv_on(j) = -1;
-                Xp_lv(j,itr) = Xp_lv(j,itr) + 1;
 
             elseif Lv_on(j) > 0 % Wait for arrival
                 Lv_on(j) = Lv_on(j) - 1;
@@ -218,6 +219,8 @@ for itr = 1:iter_max
                 % Update Demand and actual transfer stock
                 Xi_av(n_trn+1, n_dmd+1, i, itr) = Xi_av(n_trn+1, n_dmd+1, i, itr) + 1; 
                 Xp_av(n_trn+1, n_dmd+1, j, itr) = Xp_av(n_trn+1, n_dmd+1, j, itr) + 1;
+                Xi_trn(n_trn+1, i, itr) = Xi_trn(n_trn+1, i, itr) + 1;
+                Xp_trn(n_trn+1, j, itr) = Xp_trn(n_trn+1, j, itr) + 1;
             end
         end
 
@@ -330,13 +333,15 @@ ylabel('Probability')
 
 
 %% Run Analysis Method
+dt_mc = dt_sim/2;
+
 %.. InPlane Parameter
 ParaInPlane.Q = Qi;
 ParaInPlane.R = Ri;
-ParaInPlane.n_sat = N_sat;
+ParaInPlane.N_sat = N_sat;
 ParaInPlane.dt_mc = dt_mc;
 ParaInPlane.dt_plane = dt_plane;
-ParaInPlane.f_sim = p_fail;
+ParaInPlane.f_ref = p_fail;
 ParaInPlane.f_type = p_type;
 
 %.. Parking Parameter
@@ -346,55 +351,183 @@ ParaParking.dt_mc = dt_mc;
 ParaParking.dt_park = dt_park;
 ParaParking.dt_lv = dt_lv;
 ParaParking.mu_lv = mu_lv;
+
+%.. Method 1
+disp('Time Based Method:')
 ParaParking.method = 0;
-
-[PI_i, PI_p, T_i, T_p, err] = ExactInDirectProb(100, ParaInPlane, ParaParking);
-
-xx_i = length(PI_i.pi_ir)-1:-1:0;
-xx_p = length(PI_p.pi_ir)-1:-1:0;
+tic
+% for i = 1:20
+[PI_i1, PI_p1, T_i1, T_p1, err] = SolveInDirectProb(100, ParaInPlane, ParaParking);
+% end
+toc
 
 figure(3); hold on
-plot(xx_i(1:13), PI_i.pi_ir(1:13), 'r*')
-xlim([xx_i(13)-0.5, xx_i(1)+0.5])
-legend('Sim.', 'Sol.', 'location', 'best')
+plot(PI_i1.X, PI_i1.pi_avg, 'r*')
 
 figure(4); hold on
-plot(xx_p, PI_p.pi_ir, 'r*')
-% xlim([xx_p(13)-0.5, xx_p(1)+0.5])
-legend('Sim.', 'Sol.', 'location', 'best')
+plot(PI_p1.X, PI_p1.pi_avg, 'r*')
 
 figure(42); hold on
-plot(xx_p, PI_p.pi_q, 'r*')
-% xlim([xx_p(13)-0.5, xx_p(1)+0.5])
-legend('Sim.', 'Sol.', 'location', 'best')
+plot(PI_p1.X, PI_p1.pi_q, 'r*')
 
 figure(43); hold on
-plot(xx_p, PI_p.pi_r, 'r*')
-% xlim([xx_p(13)-0.5, xx_p(1)+0.5])
-legend('Sim.', 'Sol.', 'location', 'best')
+plot(PI_p1.X, PI_p1.pi_r, 'r*')
 
 figure(44); hold on
-plot(0:Di_max-1, PI_i.pi_dmd, 'r*')
-% xlim([xx_p(13)-0.5, xx_p(1)+0.5])
-legend('Sim.', 'Sol.', 'location', 'best')
+plot(0:(length(PI_i1.pi_dmd)-1), PI_i1.pi_dmd, 'r*')
 
 figure(31)
-plot(xx_i(1:10), PI_i.pi_ir(1:10), 'yo', 'MarkerFaceColor','y')
-h = zeros(3, 1);
-h(1) = plot(nan,'k*');
-h(2) = plot(nan,'ro', 'MarkerFaceColor','r');
-h(3) = plot(nan,'yo', 'MarkerFaceColor','y');
-legend(h, 'Each Orbit','Avg','Sol');
+plot(PI_i1.X, PI_i1.pi_avg, 'yo', 'MarkerFaceColor','y')
 
 figure(41)
-plot(xx_p, PI_p.pi_ir, 'yo', 'MarkerFaceColor','y')
-h = zeros(3, 1);
-h(1) = plot(nan,'k*');
-h(2) = plot(nan,'ro', 'MarkerFaceColor','r');
-h(3) = plot(nan,'yo', 'MarkerFaceColor','y');
-legend(h, 'Each Orbit','Avg','Sol');
+plot(PI_p1.X, PI_p1.pi_avg, 'yo', 'MarkerFaceColor','y')
 
-figure(5)
+figure(5); hold on
 plot(1:length(err), log10(err), '-o')
 xlabel('Iterations')
 ylabel('log_{10} of relative error')
+
+
+%.. Method 2
+disp('Ratio Based Method:')
+ParaParking.method = 0;
+tic
+% for i = 1:20
+[PI_i2, PI_p2, T_i2, T_p2, err] = SolveInDirectProb(100, ParaInPlane, ParaParking);
+% end
+toc
+
+figure(3); hold on
+plot(PI_i2.X, PI_i2.pi_avg, 'go')
+legend('Sim.', 'Sol.1', 'Sol.2', 'location', 'best')
+
+figure(4); hold on
+plot(PI_p2.X, PI_p2.pi_avg, 'go')
+legend('Sim.', 'Sol.1', 'Sol.2', 'location', 'best')
+
+figure(42); hold on
+plot(PI_p2.X, PI_p2.pi_q, 'go')
+legend('Sim.', 'Sol.1', 'Sol.2', 'location', 'best')
+
+figure(43); hold on
+plot(PI_p2.X, PI_p2.pi_r, 'go')
+legend('Sim.', 'Sol.1', 'Sol.2', 'location', 'best')
+
+figure(44); hold on
+plot(0:(length(PI_i2.pi_dmd)-1), PI_i2.pi_dmd, 'go')
+legend('Sim.', 'Sol.1', 'Sol.2', 'location', 'best')
+
+figure(31)
+plot(PI_i2.X, PI_i2.pi_avg, 'gx', 'MarkerFaceColor','y')
+h = zeros(4, 1);
+h(1) = plot(nan,'k*');
+h(2) = plot(nan,'ro', 'MarkerFaceColor','r');
+h(3) = plot(nan,'yo', 'MarkerFaceColor','y');
+h(4) = plot(nan,'gx', 'MarkerFaceColor','y');
+legend(h, 'Each Orbit','Avg','Sol.1','Sol.2');
+
+figure(41)
+plot(PI_p2.X, PI_p2.pi_avg, 'gx', 'MarkerFaceColor','y')
+h = zeros(4, 1);
+h(1) = plot(nan,'k*');
+h(2) = plot(nan,'ro', 'MarkerFaceColor','r');
+h(3) = plot(nan,'yo', 'MarkerFaceColor','y');
+h(4) = plot(nan,'gx', 'MarkerFaceColor','y');
+legend(h, 'Each Orbit','Avg','Sol.1','Sol.2');
+
+figure(5)
+plot(1:length(err), log10(err), '-x')
+xlabel('Iterations')
+ylabel('log_{10} of relative error')
+legend('Sol.1', 'Sol.2', 'location', 'best')
+
+
+%% Additional Cost Validation
+c_build = 0.5; %[$/sat]
+c_hold_plane = 0.5/365; %[$/sat/day]
+c_hold_park = 0.5/365; %[$/sat/day]
+c_lv_heavy_part = 2; %[$/sat/launch]
+c_lv_heavy_full = 67; %[%/launch]
+c_transfer = 0.5; % Risk and additional cost for indirect transfer [M$/batch]
+c_fuel = 0.001; % Fuel cost for indirect transfer [M$/batch]
+N_lv_max_heavy = 40;
+
+ParaInPlane.alt = h_plane;
+ParaInPlane.inc = i_plane;
+ParaInPlane.N_orbit = N_plane;
+
+ParaParking.dt_mc = dt_mc;
+ParaParking.mu_lv = mu_lv;
+ParaParking.dt_lv = dt_lv;
+ParaParking.inc = i_park;
+ParaParking.method = 0;
+
+ParaCost.c_build = c_build;
+ParaCost.c_hold_plane = c_hold_plane;
+ParaCost.c_hold_park = c_hold_park;
+ParaCost.c_lv_heavy_part = c_lv_heavy_part;
+ParaCost.c_lv_heavy_full = c_lv_heavy_full;
+ParaCost.c_transfer = c_transfer;
+ParaCost.c_fuel = c_fuel;
+ParaCost.m_sat = 150; % [kg]
+ParaCost.m_bus = 100; % [kg]
+ParaCost.Vex = 2.16; % [km/s]
+
+ParaConst.p_loss_plane = 0.05;
+ParaConst.p_loss_park = 0.5;
+ParaConst.N_lv_max_heavy = N_lv_max_heavy;
+
+%.. Simulation Result
+Si_on = Ni_on - N_sat;
+Si_on(Si_on < 0) = 0; 
+Ni_avg = mean(mean(mean(Ni_on,3),1),2);
+Si_avg = mean(mean(mean(Si_on,3),1),2);
+Sp_avg = mean(mean(mean(Np_on,3),1),2);
+Nlv = sum(sum(Xp_lv,2));
+Ntrn = sum(sum(Xp_trn,3),2);
+
+f_lv = Nlv/(iter_max*time_sim(end));
+f_sat = Qi*Qp*Nlv/(iter_max*time_sim(end));
+f_trn = dot(0:Di_max,Ntrn)/(iter_max*time_sim(end));
+p_loss = sum(Xi_on(1:N_sat,:))./sum(Xi_on,1);
+
+disp('Simulation Results')
+disp(['Avg. # InPlane Sat: ',num2str(Ni_avg)])
+disp(['Avg. # InPlane Spares: ',num2str(Si_avg)])
+disp(['Avg. # Parking Spares: ',num2str(Sp_avg)])
+disp(['# of bulit sat per unit time: ', num2str(f_sat)])
+disp(['# of LV per unit time: ', num2str(f_lv)])
+disp(['# of transfered spares per unit time: ', num2str(f_trn)])
+disp(['P(Xi< N_sat): ', num2str(mean(p_loss))])
+
+%.. Analysis result
+ni_avg = sum(PI_i1.X.*PI_i1.pi_avg);
+idx = find(PI_i1.X == N_sat);
+ni_spare = sum((PI_i1.X(1:idx-1)-N_sat).*PI_i1.pi_avg(1:idx-1));
+np_avg = sum(PI_p1.X.*PI_p1.pi_avg);
+f_lv = N_park/T_p1.T_avg;
+f_sat = Qi*Qp*N_park/T_p1.T_avg;
+f_trn = N_plane*(dot(PI_i1.X, PI_i1.pi_q) - dot(PI_i1.X, PI_i1.pi_r))/Qi/T_i1.T_avg;
+p_loss = sum(PI_i1.pi_avg(idx+1:end));
+
+disp(' ')
+disp('Analysis Results')
+disp(['Avg. # Sat: ', num2str(ni_avg)])
+disp(['Avg. # InPlane Spares: ',num2str(ni_spare)])
+disp(['Avg. # Parking Spares: ',num2str(np_avg)])
+disp(['# of bulit sat per unit time: ', num2str(f_sat)])
+disp(['# of LV per unit time: ', num2str(f_lv)])
+disp(['# of transfered spares per unit time: ', num2str(f_trn)])
+disp(['P(Xi< N_sat): ', num2str(p_loss)])
+
+%.. Using external function
+[J, Cost] = CostInDirectResupply([Qi Ri Qp Rp N_park h_park], ParaCost, ParaInPlane, ParaParking);
+c = ConstInDirectResupply([Qi Ri Qp Rp N_park h_park], ParaConst, ParaInPlane, ParaParking);
+
+disp(' ')
+disp('External Function Results')
+disp(['Build Cost: ',num2str(Cost.C_build)])
+disp(['Holding Cost: ',num2str(Cost.C_hold)])
+disp(['Launch Cost: ',num2str(Cost.C_launch)])
+disp(['Transfer Cost: ',num2str(Cost.C_transfer)])
+disp(['P(Xi< N_sat): ',num2str(c(1)+ParaConst.p_loss_plane)])

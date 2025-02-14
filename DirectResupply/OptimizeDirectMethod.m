@@ -30,8 +30,9 @@ N_plane     =   40;                     % The number of orbital planes for const
 N_sat       =   40;                     % The number of desigend satellites for each plane
 
 %.. (small) Direct LV Parameters (goes to in-plane orbit)
-mu_lv_small     =   30;
-dt_lv_small     =   15;                % [day]
+mu_lv_small     =   30; % [day]
+dt_lv_small     =   15; % [day]
+N_lv_max_small  =   3;  % # of max sat. capa. for small LV
 
 %.. Cost Model
 c_build = 0.5; % Manufacturing cost per satellite [M$/sat]
@@ -58,11 +59,12 @@ ParaCost.c_lv_small_part = c_lv_small_part;
 ParaCost.c_lv_small_full = c_lv_small_full;
 
 ParaConst.p_loss = p_loss;
+ParaConst.N_lv_max_small = N_lv_max_small;
 
 %% Design Variable
 %.. Launch Vehicle Size Model (Design Var.)
 Qmin = 1;
-Qmax = 3;
+Qmax = N_lv_max_small;
 
 %.. Reorder Point Range (Design Var.)
 Rmin = N_sat - 2*Qmax; % Considered to reduce the search space

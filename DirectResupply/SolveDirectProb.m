@@ -15,7 +15,7 @@
 %
 % Output
 % PI: Set of Stationary State Distribution
-%   Xi: State vector of Markov Chain
+%   X: State vector of Markov Chain
 %   pi_dr: Prob. dist. for the entire cycle
 %   pi_np: Prob. dist. for the non-reordering period
 %   pi_wp: Prob. dist. for the waitting period
@@ -176,7 +176,7 @@ function [PI, T] = SolveDirectProb(ParaInPlane)
     end
     
     %.. Output
-    PI.Xi = x;
+    PI.X = x;
     PI.pi_dr = pi_dr;
     PI.pi_np = pi_np;
     PI.pi_wp = pi_wp;

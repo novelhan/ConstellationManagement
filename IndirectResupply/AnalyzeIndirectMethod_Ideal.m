@@ -18,7 +18,7 @@ addpath([libdir, 'CommonSource'])
 iter_max    =   1;
 
 %.. Sim time
-dt_sim      =   3;                      % [day]
+dt_sim      =   1;                      % [day]
 time_sim    =   0:dt_sim:365*500;
 
 %.. Constellation Parameters
@@ -28,15 +28,15 @@ n_sat       =   40;                     % The number of desigend satellites for 
 a_plane     =   360/n_plane;
 a_park      =   360/n_park;
 
-%.. In-Orbit Period
-dt_contact  =   15;
-cnt_contact =   round(dt_contact/dt_sim);
-W_RAAN      =   a_plane/dt_contact;
+%.. Parking Period Period
+dt_park     =   15;
+cnt_park    =   round(dt_park/dt_sim);
+W_RAAN      =   a_plane/dt_park;
 
 %.. RAAN Drift time (lead time)
-dt_drift    =   round(a_park/W_RAAN);                % [day]
-cnt_drift   =   round(dt_drift/dt_sim);
-n_drift     =   floor(length(time_sim)/cnt_drift);
+dt_plane    =   round(a_park/W_RAAN);                % [day]
+cnt_plane   =   round(dt_plane/dt_sim);
+n_drift     =   floor(length(time_sim)/cnt_plane);
 
 %.. LV Lead Time
 mu_lv       =   60;
@@ -54,7 +54,7 @@ Qi      =   4;
 Ri      =   n_sat + 2;
 
 %.. Parking (Q,R) Policy Parameter
-kq      =   8;
+kq      =   12;
 kr      =   7;
 Qp      =   Qi*kq;
 Rp      =   Qi*kr;
@@ -109,7 +109,7 @@ for itr = 1:iter_max
         [min_angle, min_orbit] = min(mod(Wplane0 - Wpark0(i),2*pi));
         T0 = min_angle/W_RAAN;   % Time for first RAAN match
         Tf = time_sim(end);
-        Tidx = 1 + round((T0 + 0:dt_contact:Tf)/dt_sim); % Time index for RAAN match for entire period
+        Tidx = 1 + round((T0 + 0:dt_park:Tf)/dt_sim); % Time index for RAAN match for entire period
         Oidx = mod(min_orbit - 1 + (0:(length(Tidx)-1)), n_plane) + 1; % In-orbit index at Time index
         for j = 1:length(Tidx)
             if time_sim(Tidx(j)) <= Tf
@@ -149,7 +149,6 @@ for itr = 1:iter_max
 
                 % Update LV Parameters
                 Lv_on(j) = -1;
-                Xp_lv(j,itr) = Xp_lv(j,itr) + 1;
 
             elseif Lv_on(j) > 0 % Wait for arrival
                 Lv_on(j) = Lv_on(j) - 1;
@@ -299,73 +298,110 @@ dt_mc       =   dt_sim;                 % [day]
 %.. InPlane Parameter
 ParaInPlane.Q = Qi;
 ParaInPlane.R = Ri;
-ParaInPlane.n_sat = n_sat;
+ParaInPlane.N_sat = n_sat;
 ParaInPlane.dt_mc = dt_mc;
-ParaInPlane.dt_plane = dt_drift;
-ParaInPlane.f_sim = p_fail;
+ParaInPlane.dt_plane = dt_plane;
+ParaInPlane.f_ref = p_fail;
 ParaInPlane.f_type = p_type;
 
 %.. Parking Parameter
 ParaParking.Q = kq;
 ParaParking.R = kr;
 ParaParking.dt_mc = dt_mc;
-ParaParking.dt_park = dt_contact;
+ParaParking.dt_park = dt_park;
 ParaParking.dt_lv = dt_lv;
 ParaParking.mu_lv = mu_lv;
-ParaParking.method = 1;
 
-[PI_i, PI_p, T_i, T_p, err] = ExactInDirectProb(100, ParaInPlane, ParaParking);
-
-xx_i = length(PI_i.pi_ir)-1:-1:0;
-xx_p = length(PI_p.pi_ir)-1:-1:0;
+%.. Method 1
+disp('Time Based Method:')
+ParaParking.method = 0;
+tic
+for i = 1:20
+[PI_i1, PI_p1, T_i1, T_p1, err] = SolveInDirectProb(100, ParaInPlane, ParaParking);
+end
+toc
 
 figure(3); hold on
-plot(xx_i(1:13), PI_i.pi_ir(1:13), 'r*')
-xlim([xx_i(13)-0.5, xx_i(1)+0.5])
-legend('Sim.', 'Sol.', 'location', 'best')
+plot(PI_i1.X, PI_i1.pi_avg, 'r*')
 
 figure(4); hold on
-plot(xx_p, PI_p.pi_ir, 'r*')
-% xlim([xx_p(13)-0.5, xx_p(1)+0.5])
-legend('Sim.', 'Sol.', 'location', 'best')
+plot(PI_p1.X, PI_p1.pi_avg, 'r*')
 
 figure(42); hold on
-plot(xx_p, PI_p.pi_q, 'r*')
-% xlim([xx_p(13)-0.5, xx_p(1)+0.5])
-legend('Sim.', 'Sol.', 'location', 'best')
+plot(PI_p1.X, PI_p1.pi_q, 'r*')
 
 figure(43); hold on
-plot(xx_p, PI_p.pi_r, 'r*')
-% xlim([xx_p(13)-0.5, xx_p(1)+0.5])
-legend('Sim.', 'Sol.', 'location', 'best')
+plot(PI_p1.X, PI_p1.pi_r, 'r*')
 
 figure(44); hold on
-plot(0:Di_max-1, PI_i.pi_dmd, 'r*')
-% xlim([xx_p(13)-0.5, xx_p(1)+0.5])
-legend('Sim.', 'Sol.', 'location', 'best')
+plot(0:(length(PI_i1.pi_dmd)-1), PI_i1.pi_dmd, 'r*')
 
 figure(31)
-plot(xx_i(1:10), PI_i.pi_ir(1:10), 'yo', 'MarkerFaceColor','y')
-h = zeros(3, 1);
-h(1) = plot(nan,'k*');
-h(2) = plot(nan,'ro', 'MarkerFaceColor','r');
-h(3) = plot(nan,'yo', 'MarkerFaceColor','y');
-legend(h, 'Each Orbit','Avg','Sol');
+plot(PI_i1.X, PI_i1.pi_avg, 'yo', 'MarkerFaceColor','y')
 
 figure(41)
-plot(xx_p, PI_p.pi_ir, 'yo', 'MarkerFaceColor','y')
-h = zeros(3, 1);
-h(1) = plot(nan,'k*');
-h(2) = plot(nan,'ro', 'MarkerFaceColor','r');
-h(3) = plot(nan,'yo', 'MarkerFaceColor','y');
-legend(h, 'Each Orbit','Avg','Sol');
+plot(PI_p1.X, PI_p1.pi_avg, 'yo', 'MarkerFaceColor','y')
 
-figure(5)
+figure(5); hold on
 plot(1:length(err), log10(err), '-o')
 xlabel('Iterations')
 ylabel('log_{10} of relative error')
 
+%.. Method 2
+disp('Ratio Based Method:')
+ParaParking.method = 1;
+tic
+for i = 1:20
+[PI_i2, PI_p2, T_i2, T_p2, err] = SolveInDirectProb(100, ParaInPlane, ParaParking);
+end
+toc
+
+figure(3); hold on
+plot(PI_i2.X, PI_i2.pi_avg, 'go')
+legend('Sim.', 'Sol.1', 'Sol.2', 'location', 'best')
+
+figure(4); hold on
+plot(PI_p2.X, PI_p2.pi_avg, 'go')
+legend('Sim.', 'Sol.1', 'Sol.2', 'location', 'best')
+
+figure(42); hold on
+plot(PI_p2.X, PI_p2.pi_q, 'go')
+legend('Sim.', 'Sol.1', 'Sol.2', 'location', 'best')
+
+figure(43); hold on
+plot(PI_p2.X, PI_p2.pi_r, 'go')
+legend('Sim.', 'Sol.1', 'Sol.2', 'location', 'best')
+
+figure(44); hold on
+plot(0:(length(PI_i2.pi_dmd)-1), PI_i2.pi_dmd, 'go')
+legend('Sim.', 'Sol.1', 'Sol.2', 'location', 'best')
+
+figure(31)
+plot(PI_i2.X, PI_i2.pi_avg, 'gx', 'MarkerFaceColor','y')
+h = zeros(4, 1);
+h(1) = plot(nan,'k*');
+h(2) = plot(nan,'ro', 'MarkerFaceColor','r');
+h(3) = plot(nan,'yo', 'MarkerFaceColor','y');
+h(4) = plot(nan,'gx', 'MarkerFaceColor','y');
+legend(h, 'Each Orbit','Avg','Sol.1','Sol.2');
+
+figure(41)
+plot(PI_p2.X, PI_p2.pi_avg, 'gx', 'MarkerFaceColor','y')
+h = zeros(4, 1);
+h(1) = plot(nan,'k*');
+h(2) = plot(nan,'ro', 'MarkerFaceColor','r');
+h(3) = plot(nan,'yo', 'MarkerFaceColor','y');
+h(4) = plot(nan,'gx', 'MarkerFaceColor','y');
+legend(h, 'Each Orbit','Avg','Sol.1','Sol.2');
+
+figure(5)
+plot(1:length(err), log10(err), '-x')
+xlabel('Iterations')
+ylabel('log_{10} of relative error')
+legend('Sol.1', 'Sol.2', 'location', 'best')
+
 % diag(sum(sum(Xp_av,4),3))'./(sum(sum(sum(Xp_av,4),3))+0.0001)
 % PI_p.Pdav
 
-abs(mean(mean(sum(Ni_on,3))) - xx_i*PI_i.pi_ir)/(xx_i*PI_i.pi_ir)*100
+abs(mean(mean(sum(Ni_on,3))) - dot(PI_i1.X,PI_i1.pi_avg))/dot(PI_i1.X,PI_i1.pi_avg)*100
+abs(mean(mean(sum(Np_on,3))) - dot(PI_p1.X,PI_p1.pi_avg))/dot(PI_p1.X,PI_p1.pi_avg)*100
