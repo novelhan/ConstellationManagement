@@ -20,7 +20,7 @@ mu_earth = 3.986 * 10^5; % [km^3/sec^2]
 J2_earth = 0.00108263;
 
 %.. Selected Design Parameters: [Qi, Ri, Qp, Rp, Npark, hpakr]
-x = [1.0000   41.0000   40.0000   10.0000    3.0000  530.4796];
+x = [4.0000   41.0000   10.0000    3.0000    3.0000  712.5999];
 
 %% Test Param
 % rng('default')
@@ -390,7 +390,7 @@ ylabel('log_{10} of relative error')
 
 %.. Method 2
 disp('Ratio Based Method:')
-ParaParking.method = 0;
+ParaParking.method = 1;
 tic
 % for i = 1:20
 [PI_i2, PI_p2, T_i2, T_p2, err] = SolveInDirectProb(100, ParaInPlane, ParaParking);
@@ -473,8 +473,8 @@ ParaCost.m_sat = 150; % [kg]
 ParaCost.m_bus = 100; % [kg]
 ParaCost.Vex = 2.16; % [km/s]
 
-ParaConst.p_loss_plane = 0.05;
-ParaConst.p_loss_park = 0.5;
+ParaConst.p_loss_plane = 0;
+ParaConst.p_loss_park = 0;
 ParaConst.N_lv_max_heavy = N_lv_max_heavy;
 
 %.. Simulation Result
@@ -521,8 +521,8 @@ disp(['# of transfered spares per unit time: ', num2str(f_trn)])
 disp(['P(Xi< N_sat): ', num2str(p_loss)])
 
 %.. Using external function
-[J, Cost] = CostInDirectResupply([Qi Ri Qp Rp N_park h_park], ParaCost, ParaInPlane, ParaParking);
-c = ConstInDirectResupply([Qi Ri Qp Rp N_park h_park], ParaConst, ParaInPlane, ParaParking);
+[J, Cost] = CostInDirectResupply([Qi Ri kq kr N_park h_park], ParaCost, ParaInPlane, ParaParking);
+c = ConstInDirectResupply([Qi Ri kq kr N_park h_park], ParaConst, ParaInPlane, ParaParking);
 
 disp(' ')
 disp('External Function Results')
@@ -530,4 +530,4 @@ disp(['Build Cost: ',num2str(Cost.C_build)])
 disp(['Holding Cost: ',num2str(Cost.C_hold)])
 disp(['Launch Cost: ',num2str(Cost.C_launch)])
 disp(['Transfer Cost: ',num2str(Cost.C_transfer)])
-disp(['P(Xi< N_sat): ',num2str(c(1)+ParaConst.p_loss_plane)])
+disp(['P(Xi< N_sat): ',num2str(c(1))])

@@ -55,12 +55,12 @@ c_hold_plane = 0.5/365; %[$/sat/day]
 c_hold_park = 0.5/365; %[$/sat/day]
 c_lv_heavy_part = 2; %[$/sat/launch]
 c_lv_heavy_full = 67; %[%/launch]
-c_transfer = 0.1; % Risk and additional cost for indirect transfer [M$/batch]
+c_transfer = 0.5; % Risk and additional cost for indirect transfer [M$/batch]
 c_fuel = 0.001; % Fuel cost for indirect transfer [M$/batch]
 
 %.. Desired System Performance
 p_loss_plane  = 0.05; % Resilience Prob, the prob. having X < n_sat must be smaller than p_loss
-p_loss_park = 0.5; % Resilience Prob, the prob. having X == 0 must be smaller than p_loss
+p_loss_park = 0.2; % Resilience Prob, the prob. having X == 0 must be smaller than p_loss
 
 %.. Save the input structure
 ParaInPlane.dt_mc = dt_mc;
@@ -133,6 +133,8 @@ x_opt = ga(@(x) CostInDirectResupply(x, ParaCost, ParaInPlane, ParaParking), 6, 
            @(x) ConstInDirectResupply(x, ParaConst, ParaInPlane, ParaParking), intcon, opts);
 
 %% Check Result
+% x_opt =
+%     4.0000   41.0000   10.0000    2.0000    3.0000  712.5999
 [J, Cost] = CostInDirectResupply(x_opt, ParaCost, ParaInPlane, ParaParking)
 c = ConstInDirectResupply(x_opt, ParaConst, ParaInPlane, ParaParking)
 
