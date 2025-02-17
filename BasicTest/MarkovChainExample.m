@@ -52,21 +52,30 @@ pi_anl2 = limitdist(P); % Row vector form is used
 [pi_sim, pi_anl1, pi_anl2]
 
 %% Test Large Matrix
-n = 50;
+n = 500;
 P = rand(n,n);
 for i = 1:n
     P(:,i) = P(:,i)/sum(P(:,i));
 end
 
-iter_max = 100;
+iter_max = 10;
 tic
 for i = 1:iter_max
-    x0 = limitdist(P,2); % State-space reduction method
+    x3 = limitdist(P,3); % State-space reduction method
 end
-T0 = toc
+T3 = toc
 
 tic
 for i = 1:iter_max
-    x1 = limitdist(P); % Built-in linear solver
+    x2 = limitdist(P,2); % Built-in linear solver 
+end
+T2 = toc
+
+tic
+for i = 1:iter_max
+    x1 = limitdist(P,1); % Power Iteration
 end
 T1 = toc
+
+norm(x2-x1)
+norm(x2-x3)
