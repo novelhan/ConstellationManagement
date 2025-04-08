@@ -16,7 +16,7 @@ addpath([libdir, 'CommonSource'])
 
 %% System Parameter
 %.. Marcov Chain Period
-dt_mc   =   1;                 % [day]
+dt_mc   =   0.5;                 % [day]
 
 %.. Failure rate
 f_ref = 0.1/365; % [#/day]
@@ -30,8 +30,8 @@ N_plane     =   40;                     % The number of orbital planes for const
 N_sat       =   40;                     % The number of desigend satellites for each plane
 
 %.. (small) Direct LV Parameters (goes to in-plane orbit)
-mu_lv_small     =   30; % [day]
-dt_lv_small     =   15; % [day]
+mu_lv_small     =   40; % [day]
+dt_lv_small     =   20; % [day]
 N_lv_max_small  =   3;  % # of max sat. capa. for small LV
 
 %.. Cost Model
@@ -41,7 +41,7 @@ c_lv_small_part = 3; %[M$/sat/launch] for direct LV (small size)
 c_lv_small_full = 7.5;%[M$/launch] for direct LV (small size)
 
 %.. Desired System Performance
-p_loss  =   0.05; % Resilience Prob, the prob. having X < n_sat must be smaller than p_loss
+p_loss  =   0.01; % Resilience Prob, the prob. having X < n_sat must be smaller than p_loss
 
 %.. Save the input structure
 ParaInPlane.dt_mc = dt_mc;
@@ -82,9 +82,23 @@ opts = optimoptions('ga','MaxStallGenerations',20,'FunctionTolerance',1e-10,...
 
 %.. Run Opt
 rng default % For reproducibility
-x_opt = ga(@(x) CostDirectResupply(x,ParaCost,ParaInPlane), 2, [], [], [], [], LB, UB,...
-           @(x) ConstDirectResupply(x,ParaConst,ParaInPlane), intcon, opts);
-CostDirectResupply(x_opt,ParaCost,ParaInPlane)
+% x_opt = ga(@(x) CostDirectResupply(x,ParaCost,ParaInPlane), 2, [], [], [], [], LB, UB,...
+%            @(x) ConstDirectResupply(x,ParaConst,ParaInPlane), intcon, opts);
+
+%% Check Result
+x_opt = [3 42]; 
+% 3 41 Ref
+% 2    41 High Holding
+%  3   42 Tight const.
+[J, Cost] = CostDirectResupply(x_opt,ParaCost,ParaInPlane);
+c = ConstDirectResupply(x_opt,ParaConst,ParaInPlane);
+
+disp('External Function Results')
+disp(['Total Cost: ',num2str(J)])
+disp(['Build Cost: ',num2str(Cost.C_build)])
+disp(['Holding Cost: ',num2str(Cost.C_hold)])
+disp(['Launch Cost: ',num2str(Cost.C_launch)])
+disp(['P(Xi< N_sat): ',num2str(c(1)+p_loss)])
 %% Analysis Plot
 qq = Qmin:Qmax;
 rr = Rmin:Rmax;

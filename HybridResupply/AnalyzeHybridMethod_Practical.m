@@ -14,29 +14,33 @@ libdir = mfilepath(1:idcs(end));
 addpath([libdir, 'CommonSource'])
 addpath([libdir, 'IndirectResupply'])
 
+%.. Global Constants
+global R_earth mu_earth J2_earth
+R_earth = 6400; % [km]
+mu_earth = 3.986 * 10^5; % [km^3/sec^2]
+J2_earth = 0.00108263;
+
+% x = [4.0000   40.0000    3.0000   38.0000   10.0000    2.0000    4.0000  600];
+% x = [2.0000   41.0000    1.0000   36.0000   20.0000    3.0000    3.0000  530.1923]; % pi_q2 가 이상한 거 확인
+x = [1.0000   40.0000    1.0000   37.0000    8.0000    7.0000    7.0000  508.7363];
 %% Test Param
 % rng('default')
-iter_max    =   5;
+iter_max    =   10;
 
 %.. Sim time
-dt_sim      =   1;                  % [day]
-time_sim    =   0:dt_sim:365*100;
+dt_sim      =   0.5;                  % [day]
+time_sim    =   0:dt_sim:365*10;
 
 %.. Conversion Parameters
 R2D = 180/pi;   % Radian to Degree
 D2R = 1/R2D;
 
-%.. Earth Parameters
-R_earth     =   6400;
-mu_earth    =   3.986 * 10^5; 
-J2_earth    =   0.00108263;
-
 %.. Constellation Parameters
 N_plane     =   40;                     % The number of orbital planes for constellation
-N_park      =   3;                      % The number of parking planes for constellation
+N_park      =   x(7);                      % The number of parking planes for constellation
 N_sat       =   40;                     % The number of desigend satellites for each plane
 h_plane     =   1200;                   % Altitude of in-plane orbits [km]
-h_park      =   600;                    % Altitude of parking orbits [km]
+h_park      =   x(8);                    % Altitude of parking orbits [km]
 i_plane     =   50 * D2R;               % Inclination of in-plane orbits [rad]
 i_park      =   50 * D2R;               % Inclination of parking orbits [rad]
 
@@ -52,37 +56,37 @@ n_park      =   sqrt(mu_earth/a_park^3);
 Wdot_park   =   -3/2 * J2_earth * n_park * R_earth^2 / (a_park*(1-e_park))^2 * cos(i_park);
 
 Wdrift      =   abs(Wdot_park - Wdot_plane); % [rad/sec]
-Wdrift_dt   =   Wdrift * dt_sim * 24 * 3600; % [rad/dt]
+Wdrift_dt   =   Wdrift * 24 * 3600; % [rad/day]
 
 %.. In-Orbit/Parking Period
-dt_park     =   2*pi/ N_plane / Wdrift_dt; % Every Contact Period for Parking orbit [dt]
-dt_plane    =   2*pi/ N_park / Wdrift_dt; % Every Contact Period for In-Plane orbit [dt]
+dt_park     =   2*pi/ N_plane / Wdrift_dt; % Every Contact Period for Parking orbit [day]
+dt_plane    =   2*pi/ N_park / Wdrift_dt; % Every Contact Period for In-Plane orbit [day]
 
 %.. Indirect LV Parameters (goes to parking orbit)
-mu_lv_park      =   60;
-dt_lv_park      =   30;                % [day]
-cnt_lv_park     =   round(dt_lv_park/dt_sim);
+mu_lv_heavy      =   60;
+dt_lv_heavy      =   30;                % [day]
+cnt_lv_heavy     =   round(dt_lv_heavy/dt_sim);
 
 %.. Direct LV Parameters (goes to in-plane orbit)
-mu_lv_plane     =   30;
-dt_lv_plane     =   15;                % [day]
-cnt_lv_plane    =   round(dt_lv_plane/dt_sim);
+mu_lv_small     =   40;
+dt_lv_small     =   20;                % [day]
+cnt_lv_small    =   round(dt_lv_small/dt_sim);
 
 %.. Failure rate 
 %!! If failure rate >> resupply speed -> the method will give poor result
 p_fail      =   0.1/365;            % [#/day]
 p_sim       =   p_fail * dt_sim;    % [#/dt_sim]
-p_type      =   0; % 0 for const, 1 for state dependant
+p_type      =   1; % 0 for const, 1 for state dependant
 
 %.. Hybrid In-plane (Q1,R1,Q2,R2) Policy Parameter
-Qi1     =   4;
-Ri1     =   42;
-Qi2     =   2;
-Ri2     =   40;
+Qi1     =   x(1);
+Ri1     =   x(2);
+Qi2     =   x(3);
+Ri2     =   x(4);
 
 %.. Parking (Q,R) Policy Parameter
-kq      =   8;
-kr      =   7;
+kq      =   x(5);
+kr      =   x(6);
 Qp      =   Qi1*kq;
 Rp      =   Qi1*kr;
 
@@ -94,8 +98,8 @@ Xp_num = 0:1:Xp_max; % State Counts
 Di_max = ceil(Xi_max/Qi1);
 
 % Max Lead Time Bin (mean + 5*sigma) [dt_sim]
-LVp_max = ceil((dt_lv_park + mu_lv_park + 5*mu_lv_park)/dt_sim); 
-LVi_max = ceil((dt_lv_plane + mu_lv_plane + 5*mu_lv_plane)/dt_sim); 
+LVp_max = ceil((dt_lv_heavy + mu_lv_heavy + 5*mu_lv_heavy)/dt_sim); 
+LVi_max = ceil((dt_lv_small + mu_lv_small + 5*mu_lv_small)/dt_sim); 
 
 %% Simulation Result Save
 % The number of availalbe stock at each time step / histogram
@@ -105,8 +109,8 @@ Xi_on   =   zeros(Xi_max+1, N_plane, iter_max);
 Xp_on   =   zeros(Xp_max+1, N_park, iter_max);
 
 % The histogram of the number of stock right after the resupply moment
-Xi_q1   =   zeros(Xi_max+1, N_plane, iter_max);
-Xi_q2   =   zeros(Xi_max+1, N_plane, iter_max);
+Xi_q1   =   zeros(Xi_max+1, N_plane, iter_max); % Indirect
+Xi_q2   =   zeros(Xi_max+1, N_plane, iter_max); % Direct
 Xp_q    =   zeros(Xp_max+1, N_park, iter_max);
 
 % The histogram of the number of stock at the reordering moment
@@ -138,7 +142,7 @@ for itr = 1:iter_max
     Wpark0      =   mod(2*pi*rand + 2*pi/N_park*(0:1:N_park-1)',2*pi);
     Wplane0     =   2*pi/N_plane*(0:1:N_plane-1)';
     v_park2plane=   zeros(N_park, length(time_sim));
-%     v_plane2park=   zeros(N_plane, length(time_sim)); % Needed only for simulator vaildation
+    v_plane2park=   zeros(N_plane, length(time_sim)); % Needed only for simulator vaildation
     for i = 1:N_park
         [min_angle, min_orbit] = min(mod(Wplane0 - Wpark0(i),2*pi));
         T0 = min_angle/Wdrift_dt;   % Time for first RAAN match
@@ -148,20 +152,20 @@ for itr = 1:iter_max
         for j = 1:length(Tidx)
             if time_sim(Tidx(j)) <= Tf
                 v_park2plane(i,Tidx(j)) = Oidx(j);
-%                 v_plane2park(Oidx(j),Tidx(j)) = i; 
+                v_plane2park(Oidx(j),Tidx(j)) = i; 
             end  
         end
     end
     
     % Needed only for simulator vaildation 
     if 0
-        disp(['Parking Orbit Period should be:' num2str(dt_park*dt_sim)])
+        disp(['Parking Orbit Period should be:' num2str(dt_park)])
         for i = 1:N_park
             disp(['Parking Orbit', num2str(i), ' is ', num2str(mean(diff(find(v_park2plane(1,:)' ~= 0)))*dt_sim)])
         end
 
         disp(' ')
-        disp(['In-Plane Orbit Period should be:' num2str(dt_plane*dt_sim)])
+        disp(['In-Plane Orbit Period should be:' num2str(dt_plane)])
         for i = 1:N_plane
             disp(['In-Plane Orbit', num2str(i), ' is ', num2str(mean(diff(find(v_plane2park(1,:)' ~= 0)))*dt_sim)])
         end
@@ -217,7 +221,6 @@ for itr = 1:iter_max
 
                 % Update LV Parameters
                 LVi_on(i) = -1;
-                Xi_lv(i,itr) = Xi_lv(i,itr) + 1;
 
             elseif LVi_on(i) > 0 % Wait for arrival
                 LVi_on(i) = LVi_on(i) - 1;
@@ -257,8 +260,8 @@ for itr = 1:iter_max
             % LV must be available, # of spares < kr 
             if LVp_on(j) == -1 && Np_on_k(j) <= kr
                 % Sample Lead Time and Save
-                t_Lv = dt_lv_park + CustomExpRnd(mu_lv_park,1);
-                LVp_on(j) = ceil( t_Lv/dt_sim );
+                t_LV = dt_lv_heavy + CustomExpRnd(mu_lv_heavy,1);
+                LVp_on(j) = ceil( t_LV/dt_sim );
                 
                 % Update Xp_lv
                 Xp_lv(j,itr) = Xp_lv(j,itr) + 1;
@@ -276,8 +279,8 @@ for itr = 1:iter_max
             % LVi must be available, # of spares < Ri2 
             if LVi_on(i) == -1 && Ni_on_k(i) <= Ri2
                 % Sample Lead Time and Save
-                t_Lv = dt_lv_plane + CustomExpRnd(mu_lv_plane,1);
-                LVi_on(i) = ceil( t_Lv/dt_sim );
+                t_LV = dt_lv_small + CustomExpRnd(mu_lv_small,1);
+                LVi_on(i) = ceil( t_LV/dt_sim );
                 
                 % Update Xp_lv
                 Xi_lv(i,itr) = Xi_lv(i,itr) + 1;
@@ -321,16 +324,18 @@ Xi_r1 = sum(Xi_r1,3);
 Xi_r2 = sum(Xi_r2,3);
 Xi_q1 = sum(Xi_q1,3);
 Xi_q2 = sum(Xi_q2,3);
+Xi_av = sum(Xi_av,4);
+Xp_av = sum(Xp_av,4);
 
-figure(1)
-plot(time_sim, Ni_on(:,:,1))
-xlabel('Time [day]')
-ylabel('Number of in-plane stock for entire period')
-
-figure(2)
-plot(time_sim, Np_on(:,:,1))
-xlabel('Time [day]')
-ylabel('Number of parking stock for entire period')
+% figure(1)
+% plot(time_sim, Ni_on(:,:,1))
+% xlabel('Time [day]')
+% ylabel('Number of in-plane stock for entire period')
+% 
+% figure(2)
+% plot(time_sim, Np_on(:,:,1))
+% xlabel('Time [day]')
+% ylabel('Number of parking stock for entire period')
 
 figure(3); hold on
 histogram('BinEdges', xxi_edge, 'BinCounts', sum(Xi_on,2),'Normalization','probability')
@@ -380,7 +385,7 @@ ylabel('Probability')
 
 figure(44); hold on
 histogram('BinEdges', dmd_edge, 'BinCounts', sum(Xi_dmd,2),'Normalization','probability')
-xlabel('Number of parking stock for entire period')
+xlabel('Demand Probability Distribution')
 ylabel('Probability')
 
 figure(51); hold on
@@ -405,79 +410,63 @@ ylabel('Probability')
 
 %% Run Analysis Method
 %.. Marcov Chain Period
-dt_mc       =   dt_sim/2;                 % [day]
+dt_mc       =   dt_sim;                 % [day]
 
 %.. InPlane Parameter
-ParaFail.dt_mc = dt_mc;
-ParaFail.f_ref = p_fail;
-ParaFail.f_type = p_type;
-ParaFail.n_sat = N_sat;
+ParaInPlane.dt_mc = dt_mc;
+ParaInPlane.f_ref = p_fail;
+ParaInPlane.f_type = p_type;
+ParaInPlane.N_sat = N_sat;
 
 %.. Direct Resupply Parameter
-ParaDirect.mu = mu_lv_plane;
-ParaDirect.dt_lv = dt_lv_plane;
-ParaDirect.Q2 = Qi2;
-ParaDirect.R2 = Ri2;
+ParaInPlane.mu = mu_lv_small;
+ParaInPlane.dt_lv = dt_lv_small;
+ParaInPlane.Q2 = Qi2;
+ParaInPlane.R2 = Ri2;
 
 %.. Indirect Resupply Parameter
-ParaIndirect.dt_plane = dt_plane;
-ParaIndirect.kappa = ones(Di_max+1,1);
-ParaIndirect.Q1 = Qi1;
-ParaIndirect.R1 = Ri1;
+ParaInPlane.dt_plane = dt_plane;
+ParaInPlane.Q1 = Qi1;
+ParaInPlane.R1 = Ri1;
 
 %.. Full state result
-ParaDim.flag = 0;
-ParaDim.x_min = min(Ri1,Ri2) - ceil((3*p_fail*N_sat)*(dt_lv_plane + 2*mu_lv_plane));
-ParaDim.n_seg = round( (dt_lv_plane/dt_mc - 1)/3 );
-
-%.. Save Input structure for InPlane
-ParaInPlane.ParaFail = ParaFail;
-ParaInPlane.ParaDirect = ParaDirect;
-ParaInPlane.ParaIndirect = ParaIndirect;
-ParaInPlane.ParaDim = ParaDim;
+ParaInPlane.dim_flag = 0;
+% ParaInPlane.x_min = min(Ri1,Ri2) - ceil((3*p_fail*N_sat)*(dt_lv_small + 2*mu_lv_small));
+% ParaInPlane.n_seg = round( (dt_lv_small/dt_mc - 1)/3 );
 
 %.. Parking Parameter
 ParaParking.Q = kq;
 ParaParking.R = kr;
 ParaParking.dt_mc = dt_mc;
 ParaParking.dt_park = dt_park;
-ParaParking.dt_lv = dt_lv_park;
-ParaParking.mu_lv = mu_lv_park;
+ParaParking.dt_lv = dt_lv_heavy;
+ParaParking.mu_lv = mu_lv_heavy;
 ParaParking.method = 1;
 
-[PI_i, PI_p, T_i, T_p, err] = HybridProb(100, ParaInPlane, ParaParking);
-
-pi_hr = mean(PI_i.pi_hr,2);
-xx_i = length(pi_hr)-1:-1:0;
-xx_p = length(PI_p.pi_ir)-1:-1:0;
+[PI_i, PI_p, T_i, T_p, err] = SolveHybridProb(100, ParaInPlane, ParaParking);
 
 figure(3); hold on
-plot(xx_i(1:13), pi_hr(1:13), 'r*')
-xlim([xx_i(13)-0.5, xx_i(1)+0.5])
+plot(PI_i.X, abs(PI_i.pi_avg), 'r*')
 legend('Sim.', 'Sol.', 'location', 'best')
 
 figure(4); hold on
-plot(xx_p, PI_p.pi_ir, 'r*')
-% xlim([xx_p(13)-0.5, xx_p(1)+0.5])
+plot(PI_p.X, abs(PI_p.pi_avg), 'r*')
 legend('Sim.', 'Sol.', 'location', 'best')
 
 figure(42); hold on
-plot(xx_p, PI_p.pi_q, 'r*')
-% xlim([xx_p(13)-0.5, xx_p(1)+0.5])
+plot(PI_p.X, abs(PI_p.pi_q), 'r*')
 legend('Sim.', 'Sol.', 'location', 'best')
 
 figure(43); hold on
-plot(xx_p, PI_p.pi_r, 'r*')
-% xlim([xx_p(13)-0.5, xx_p(1)+0.5])
+plot(PI_p.X, abs(PI_p.pi_r), 'r*')
 legend('Sim.', 'Sol.', 'location', 'best')
 
 figure(44); hold on
-plot(0:length(PI_i.pi_dmd)-1, PI_i.pi_dmd, 'r*')
-% xlim([xx_p(13)-0.5, xx_p(1)+0.5])
+plot(0:length(PI_i.pi_dmd)-1, abs(PI_i.pi_dmd), 'r*')
 legend('Sim.', 'Sol.', 'location', 'best')
 
 figure(31)
-plot(xx_i(1:13), pi_hr(1:13), 'yo', 'MarkerFaceColor','y')
+plot(PI_i.X, PI_i.pi_avg, 'yo', 'MarkerFaceColor','y')
 h = zeros(3, 1);
 h(1) = plot(nan,'k*');
 h(2) = plot(nan,'ro', 'MarkerFaceColor','r');
@@ -485,7 +474,7 @@ h(3) = plot(nan,'yo', 'MarkerFaceColor','y');
 legend(h, 'Each Orbit','Avg','Sol');
 
 figure(41)
-plot(xx_p, PI_p.pi_ir, 'yo', 'MarkerFaceColor','y')
+plot(PI_p.X, PI_p.pi_avg, 'yo', 'MarkerFaceColor','y')
 h = zeros(3, 1);
 h(1) = plot(nan,'k*');
 h(2) = plot(nan,'ro', 'MarkerFaceColor','r');
@@ -493,18 +482,126 @@ h(3) = plot(nan,'yo', 'MarkerFaceColor','y');
 legend(h, 'Each Orbit','Avg','Sol');
 
 figure(51); hold on
-plot(xx_i(1:13), PI_i.pi_r1(1:13), 'r*')
+plot(PI_i.X, abs(PI_i.pi_r1), 'r*')
+legend('Sim.', 'Sol.', 'location', 'best')
 
 figure(52); hold on
-plot(xx_i(1:13), PI_i.pi_r2(1:13), 'r*')
+plot(PI_i.X, abs(PI_i.pi_r2), 'r*')
+legend('Sim.', 'Sol.', 'location', 'best')
 
 figure(53); hold on
-plot(xx_i(1:13), PI_i.pi_q1(1:13), 'r*')
+plot(PI_i.X, abs(PI_i.pi_q1), 'r*')
+legend('Sim.', 'Sol.', 'location', 'best')
 
 figure(54); hold on
-plot(xx_i(1:13), PI_i.pi_q2(1:13), 'r*')
+plot(PI_i.X, abs(PI_i.pi_q2), 'r*')
+legend('Sim.', 'Sol.', 'location', 'best')
 
-figure(5)
-plot(1:length(err), log10(err), '-o')
-xlabel('Iterations')
-ylabel('log_{10} of relative error')
+% figure(5)
+% plot(1:length(err), log10(err), '-o')
+% xlabel('Iterations')
+% ylabel('log_{10} of relative error')
+
+
+%% Additional Cost Validation
+c_build = 0.5; %[$/sat]
+c_hold_plane = .5/365; %[$/sat/day]
+c_hold_park = .5/365; %[$/sat/day]
+c_lv_heavy_part = 2; %[$/sat/launch]
+c_lv_heavy_full = 67; %[%/launch]
+c_lv_small_part = 3; %[$/sat/launch]
+c_lv_small_full = 7.5; %[%/launch]
+c_transfer = 0.5; % Risk and additional cost for indirect transfer [M$/batch]
+c_fuel = 0.001; % Fuel cost for indirect transfer [M$/batch]
+N_lv_max_heavy = 40;
+N_lv_max_small = 3;
+
+ParaCost.c_build = c_build;
+ParaCost.c_hold_plane = c_hold_plane;
+ParaCost.c_hold_park = c_hold_park;
+ParaCost.c_lv_heavy_part = c_lv_heavy_part;
+ParaCost.c_lv_heavy_full = c_lv_heavy_full;
+ParaCost.c_lv_small_part = c_lv_small_part;
+ParaCost.c_lv_small_full = c_lv_small_full;
+ParaCost.c_transfer = c_transfer;
+ParaCost.c_fuel = c_fuel;
+ParaCost.m_sat = 150; % [kg]
+ParaCost.m_bus = 100; % [kg]
+ParaCost.Vex = 2.16; % [km/s]
+
+ParaConst.p_loss_plane = 0;
+ParaConst.p_loss_park = 0;
+ParaConst.N_lv_max_heavy = N_lv_max_heavy;
+ParaConst.N_lv_max_small = N_lv_max_small;
+
+ParaInPlane.alt = h_plane;
+ParaInPlane.inc = i_plane;
+ParaInPlane.N_orbit = N_plane;
+ParaInPlane.dim_flag = 1;
+
+ParaParking.mu_lv = mu_lv_heavy;
+ParaParking.dt_lv = dt_lv_heavy;
+ParaParking.inc = i_park;
+ParaParking.method = 1;
+
+%.. Simulation Result
+Si_on = Ni_on - N_sat;
+Si_on(Si_on < 0) = 0; 
+Ni_avg = mean(mean(mean(Ni_on,3),1),2);
+Si_avg = mean(mean(mean(Si_on,3),1),2);
+Sp_avg = mean(mean(mean(Np_on,3),1),2);
+Np_lv = sum(sum(Xp_lv,2));
+Ni_lv = sum(sum(Xi_lv,2));
+Ntrn = sum(sum(Xi_av,3),2);
+
+fp_lv = Np_lv/(iter_max*time_sim(end));
+fi_lv = Ni_lv/(iter_max*time_sim(end));
+f_sat = N_park*Qp*fp_lv + N_plane*Qi2*fi_lv;
+f_trn = dot(0:Di_max,Ntrn)/(iter_max*time_sim(end));
+p_loss = sum(Xi_on(1:N_sat,:))./sum(Xi_on,1);
+
+disp('Simulation Results')
+disp(['Avg. # InPlane Sat: ',num2str(Ni_avg)])
+disp(['Avg. # InPlane Spares: ',num2str(Si_avg)])
+disp(['Avg. # Parking Spares: ',num2str(Sp_avg)])
+disp(['# of bulit sat per unit time: ', num2str(f_sat)])
+disp(['# of Small LV per unit time: ', num2str(fi_lv)])
+disp(['# of Heavy LV per unit time: ', num2str(fp_lv)])
+disp(['# of transfered spares per unit time: ', num2str(f_trn)])
+disp(['P(Xi< N_sat): ', num2str(mean(p_loss))])
+
+%.. Analysis result
+ni_avg = sum(PI_i.X.*PI_i.pi_avg);
+idx = find(PI_i.X == N_sat);
+ni_spare = sum((PI_i.X(1:idx-1)-N_sat).*PI_i.pi_avg(1:idx-1));
+np_avg = sum(PI_p.X.*PI_p.pi_avg);
+fp_lv = N_park/T_p.T_avg;
+fi_lv = N_plane/T_i.T_q2;
+f_sat = N_park*Qp*fp_lv + N_plane*Qi2*fi_lv;
+f_trn = N_plane*(dot(PI_i.X, PI_i.pi_q1) - dot(PI_i.X, PI_i.pi_r1))/Qi1/T_i.T_q1;
+p_loss = sum(PI_i.pi_avg(idx+1:end));
+
+disp(' ')
+disp('Analysis Results')
+disp(['Avg. # Sat: ', num2str(ni_avg)])
+disp(['Avg. # InPlane Spares: ',num2str(ni_spare)])
+disp(['Avg. # Parking Spares: ',num2str(np_avg)])
+disp(['# of bulit sat per unit time: ', num2str(f_sat)])
+disp(['# of Small LV per unit time: ', num2str(fi_lv)])
+disp(['# of Heavy LV per unit time: ', num2str(fp_lv)])
+disp(['# of transfered spares per unit time: ', num2str(f_trn)])
+disp(['P(Xi< N_sat): ', num2str(p_loss)])
+
+%.. Using external function
+[J, Cost] = CostHybridResupply([Qi1 Ri1 Qi2 Ri2 kq kr N_park h_park], ParaCost, ParaInPlane, ParaParking);
+c = ConstHybridResupply([Qi1 Ri1 Qi2 Ri2 kq kr N_park h_park], ParaConst, ParaInPlane, ParaParking);
+
+disp(' ')
+disp('External Function Results')
+disp(['Total Cost: ',num2str(J)])
+disp(['Build Cost: ',num2str(Cost.C_build)])
+disp(['Holding Cost: ',num2str(Cost.C_hold)])
+disp(['Launch Cost: ',num2str(Cost.C_launch)])
+disp(['Transfer Cost: ',num2str(Cost.C_transfer)])
+disp(['P(Xi< N_sat): ',num2str(c(1))])
+disp(['P(Xp = 0): ',num2str(c(2))])

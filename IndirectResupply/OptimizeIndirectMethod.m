@@ -32,7 +32,7 @@ dt_mc = 0.5;                 % [day]
 f_ref = 0.1/365; % [#/day]
 f_type = 1; % 0:Const, 1:State-Dependant
 
-%.. Analysis Method
+%.. Analysis Method for Parking Analysis
 method = 0; % 0:Time based, 1:Ratio based
 
 %.. Constellation Orbit Parameters (Given)
@@ -51,15 +51,15 @@ N_lv_max_heavy = 40;    % # of max sat. capa. for heavy LV
 
 %.. Launch Vehicle Cost Model
 c_build = 0.5; %[$/sat]
-c_hold_plane = 0.5/365; %[$/sat/day]
-c_hold_park = 0.5/365; %[$/sat/day]
+c_hold_plane = 5/365; % 0.5 or 5[$/sat/day]
+c_hold_park = 5/365; % 0.5 or 5 [$/sat/day]
 c_lv_heavy_part = 2; %[$/sat/launch]
 c_lv_heavy_full = 67; %[%/launch]
 c_transfer = 0.5; % Risk and additional cost for indirect transfer [M$/batch]
 c_fuel = 0.001; % Fuel cost for indirect transfer [M$/batch]
 
 %.. Desired System Performance
-p_loss_plane  = 0.05; % Resilience Prob, the prob. having X < n_sat must be smaller than p_loss
+p_loss_plane  = 0.05; % 0.01 Resilience Prob, the prob. having X < n_sat must be smaller than p_loss
 p_loss_park = 0.2; % Resilience Prob, the prob. having X == 0 must be smaller than p_loss
 
 %.. Save the input structure
@@ -106,7 +106,7 @@ Qp_min = 1;
 Qp_max = N_lv_max_heavy;
 
 %.. Reorder Point Range (Design Var.)
-Rp_min = 0;
+Rp_min = 1;
 Rp_max = Qp_max - 1;
 
 %.. # of Parking Orbit Range
@@ -127,15 +127,26 @@ UB = [Qi_max, Ri_max, Qp_max, Rp_max, Np_max, hp_max];
 intcon = [1 2 3 4 5];
 
 opts = optimoptions('ga','MaxStallGenerations',50,'FunctionTolerance',1e-10,...
-                    'MaxGenerations',500,'PopulationSize',200,'Display','iter');
+                    'MaxGenerations',1200,'PopulationSize',600,'Display','iter');
 rng default % For reproducibility
 x_opt = ga(@(x) CostInDirectResupply(x, ParaCost, ParaInPlane, ParaParking), 6, [], [], [], [], LB, UB,...
            @(x) ConstInDirectResupply(x, ParaConst, ParaInPlane, ParaParking), intcon, opts);
 
 %% Check Result
-% x_opt =
-%     4.0000   41.0000   10.0000    2.0000    3.0000  712.5999
-[J, Cost] = CostInDirectResupply(x_opt, ParaCost, ParaInPlane, ParaParking)
-c = ConstInDirectResupply(x_opt, ParaConst, ParaInPlane, ParaParking)
-
+% x_opt = [1.0000   40.0000    9.0000    5.0000    8.0000  574.3653];
+% Ref. 4.0000   41.0000   10.0000    2.0000    3.0000  713
+% High holding cost. 1.0000   40.0000    9.0000    5.0000    8.0000  574.3653
+% Tight const. 2.0000   41.0000   20.0000    2.0000    5.0000  555
+% 4.0000   42.0000   10.0000    2.0000    3.0000  571.3087
+% 4.0000   41.0000   10.0000    2.0000    4.0000  530.5247
+[J, Cost] = CostInDirectResupply(x_opt, ParaCost, ParaInPlane, ParaParking);
+c = ConstInDirectResupply(x_opt, ParaConst, ParaInPlane, ParaParking);
+disp('External Function Results')
+disp(['Total Cost: ',num2str(J)])
+disp(['Build Cost: ',num2str(Cost.C_build)])
+disp(['Holding Cost: ',num2str(Cost.C_hold)])
+disp(['Launch Cost: ',num2str(Cost.C_launch)])
+disp(['Transfer Cost: ',num2str(Cost.C_transfer)])
+disp(['P(Xi< N_sat): ',num2str(c(1)+p_loss_plane)])
+disp(['P(Xp = 0): ',num2str(c(2)+p_loss_park)])
        

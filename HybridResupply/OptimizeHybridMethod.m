@@ -24,15 +24,17 @@ global R_earth mu_earth J2_earth
 R_earth = 6400; % [km]
 mu_earth = 3.986 * 10^5; % [km^3/sec^2]
 J2_earth = 0.00108263;
+
 %% System Parameter
 %.. Marcov Chain Period
 dt_mc = 0.5;                 % [day]
-ParaInPlane.dt_mc = dt_mc;
-ParaParking.dt_mc = dt_mc;
 
 %.. Failure rate
-f_fail = 0.1/365; % [#/day]
+f_ref = 0.1/365; % [#/day]
 f_type = 1; % 0:Constant failure, 1:State Dependent failure
+
+%.. Analysis Method for Parking Analysis
+method = 0; % 0:Time based, 1:Ratio based
 
 %.. Constellation Orbit Parameters (Given)
 N_plane     =   40;                     % The number of orbital planes for constellation
@@ -44,60 +46,93 @@ i_plane     =   50 * D2R;               % Inclination of in-plane orbits [rad]
 i_park      =   50 * D2R;               % Inclination of parking orbits [rad]
 
 %.. Indirect LV Parameters (goes to parking orbit)
-mu_lv_park      =   60;
-dt_lv_park      =   30;                % [day]
+mu_lv_heavy      =   60;
+dt_lv_heavy      =   30;                % [day]
+N_lv_max_heavy = 40; %[#sat] max capacitiy for indirect LV
 
 %.. Direct LV Parameters (goes to in-plane orbit)
-mu_lv_plane     =   30;
-dt_lv_plane     =   15;                % [day]
+mu_lv_small     =   40;
+dt_lv_small     =   20;                % [day]
+N_lv_max_small = 3; %[#sat] max capacitiy for direct LV
 
 %.. Cost Model
 c_build = 0.5; % Manufacturing cost per satellite [M$/sat]
-c_hold_plane = 0.5/365; % Holding cost per satellite in In-Plane orbit [M$/sat/day]
-c_hold_park = 0.5/365; %Holding cost per satellite in Parking orbit [M$/sat/day] [M$/sat/day]
+c_hold_plane = 5/365; % Holding cost per satellite in In-Plane orbit [M$/sat/day]
+c_hold_park = 5/365; %Holding cost per satellite in Parking orbit [M$/sat/day] [M$/sat/day]
 c_transfer = 0.5; % Risk and additional cost for indirect transfer [M$/batch]
 c_fuel = 0.001; % Fuel cost for indirect transfer [M$/batch]
-c_lv_plane_part = 3; %[M$/sat/launch] for direct LV
-c_lv_plnae_full = 7.5;%[M$/launch] for direct LV
-c_lv_park_part = 2; %[M$/sat/launch] for indirect LV
-c_lv_park_full = 67; %[M$/launch] for indirect LV
-lv_plane_max_capa = 3; %[#sat] max capacitiy for direct LV
-lv_park_max_capa = 40; %[#sat] max capacitiy for indirect LV
+
+c_lv_small_part = 3; %[M$/sat/launch] for direct LV
+c_lv_small_full = 7.5;%[M$/launch] for direct LV
+c_lv_heavy_part = 2; %[M$/sat/launch] for indirect LV
+c_lv_heavy_full = 67; %[M$/launch] for indirect LV
+
+%.. Desired System Performance
+p_loss_plane  = 0.05; % 0.01 Resilience Prob, the prob. having X < n_sat must be smaller than p_loss
+p_loss_park = 0.2; % Resilience Prob, the prob. having X == 0 must be smaller than p_loss
+
+%.. Save the input structure
+ParaInPlane.dt_mc = dt_mc;
+ParaInPlane.f_ref = f_ref;
+ParaInPlane.f_type = f_type;
+ParaInPlane.N_sat = N_sat;
+ParaInPlane.N_orbit = N_plane;
+ParaInPlane.mu = mu_lv_small;
+ParaInPlane.dt_lv = dt_lv_small;
+ParaInPlane.alt = h_plane;
+ParaInPlane.inc = i_plane;
+ParaInPlane.dim_flag = 1;
+% ParaInPlane.x_min = min(Ri1,Ri2) - ceil((3*p_fail*N_sat)*(dt_lv_small + 2*mu_lv_small));
+% ParaInPlane.n_seg = round( (dt_lv_small/dt_mc - 1)/3 );
+
+ParaParking.dt_mc = dt_mc;
+ParaParking.mu_lv = mu_lv_heavy;
+ParaParking.dt_lv = dt_lv_heavy;
+ParaParking.inc = i_park;
+ParaParking.method = method;
 
 ParaCost.c_build = c_build;
 ParaCost.c_hold_plane = c_hold_plane;
 ParaCost.c_hold_park = c_hold_park;
-ParaCost.c_lv_part = c_lv_park_part;
-ParaCost.lv_full_discount = lv_full_park_discount;
-ParaCost.Qmax = Qp_park_max;
+ParaCost.c_lv_heavy_part = c_lv_heavy_part;
+ParaCost.c_lv_heavy_full = c_lv_heavy_full;
+ParaCost.c_lv_small_part = c_lv_small_part;
+ParaCost.c_lv_small_full = c_lv_small_full;
+ParaCost.c_transfer = c_transfer;
+ParaCost.c_fuel = c_fuel;
+ParaCost.m_sat = 150; % [kg]
+ParaCost.m_bus = 100; % [kg]
+ParaCost.Vex = 2.16; % [km/s]
 
-%.. Desired System Performance
-p_loss  =   0.05; % Prob. having less than N_sat number of satellite
-ParaConst.p_loss = p_loss;
-
+ParaConst.p_loss_plane = p_loss_plane;
+ParaConst.p_loss_park = p_loss_park;
+ParaConst.N_lv_max_heavy = N_lv_max_heavy;
+ParaConst.N_lv_max_small = N_lv_max_small;
 
 %% Design Variable
 %.. In-Plane InDirect Reorder Size Range (Design Var.)
 Qi1_min = 1;
 Qi1_max = 10;
 
+%.. In-Plane InDirect Reorder Point Range (Design Var.)
+Ri1_min = N_sat - 10;
+Ri1_max = N_sat + 5;
+
 %.. In-Plane Direct Reorder Size Range (Design Var.)
 Qi2_min = 1;
-Qi2_max = 4;
+Qi2_max = N_lv_max_small;
 
-
-
-%.. In-Plane Reorder Point Range (Design Var.)
-Ri_min = N_sat - 5;
-Ri_max = N_sat + 5;
+%.. In-Plane Direct Reorder Point Range (Design Var.)
+Ri2_min = N_sat - 10;
+Ri2_max = N_sat + 5;
 
 %.. Launch Vehicle Size Range (Design Var.)
-Qp_min = 2;
-Qp_park_max = Qp_park_max;
+Qp_min = 1;
+Qp_max = N_lv_max_heavy;
 
 %.. Reorder Point Range (Design Var.)
-Rp_min = 0;
-Rp_max = Qp_park_max - 1;
+Rp_min = 1;
+Rp_max = Qp_max - 1;
 
 %.. # of Parking Orbit Range
 Np_min = 2;
@@ -107,203 +142,38 @@ Np_max = 20;
 hp_min = 500;
 hp_max = 1000;
 
-
 %% Optimize
 %.. Lower/Upper Bound
-LB = [Qi1_min, Ri_min, Qp_min, Rp_min, Np_min, hp_min];
-UB = [Qi1_max, Ri_max, Qp_park_max, Rp_max, Np_max, hp_max];
+LB = [Qi1_min, Ri1_min, Qi2_min, Ri2_min, Qp_min, Rp_min, Np_min, hp_min];
+UB = [Qi1_max, Ri1_max, Qi2_max, Ri2_max, Qp_max, Rp_max, Np_max, hp_max];
 
 %.. Integer Index and Opt Option
-intcon = [1 2 3 4 5];
+intcon = [1 2 3 4 5 6 7];
 opts = optimoptions('ga','MaxStallGenerations',50,'FunctionTolerance',1e-10,...
-                    'MaxGenerations',500,'PopulationSize',200,'Display','iter');
+                    'MaxGenerations',2000,'PopulationSize',800,'Display','iter');
 
 %.. Run Opt
-rng default % For reproducibility
-x_opt = ga(@(x) CostFun(x, ParaCost, ParaInPlane, ParaParking), 6, [], [], [], [], LB, UB,...
-           @(x) ConstFun(x, ParaConst, ParaInPlane, ParaParking), intcon, opts);
+% rng default % For reproducibility
+% x_opt = ga(@(x) CostHybridResupply(x, ParaCost, ParaInPlane, ParaParking), 8, [], [], [], [], LB, UB,...
+%            @(x) ConstHybridResupply(x, ParaConst, ParaInPlane, ParaParking), intcon, opts);
 
-%%
-CostFun(x_opt, ParaCost, ParaInPlane, ParaParking)
-ConstFun(x_opt, ParaConst, ParaInPlane, ParaParking)
+x_opt = [ 1.0000   40.0000    1.0000   37.0000    8.0000    7.0000    7.0000  508.7363]; 
+% 2.0000   41.0000    1.0000   36.0000   20.0000    3.0000    3.0000  530.1923 Ref.
+% 4.0000   41.0000    2.0000   31.0000   10.0000    2.0000    4.0000  530.5247 e_tol
+% 4.0000   42.0000    2.0000   32.0000   10.0000    2.0000    3.0000  571.1405
+% 1.0000   40.0000    1.0000   30.0000    7.0000    5.0000    9.0000  639.4550 High Holding
+% 1.0000   39.0000    2.0000   40.0000    2.0000    1.0000    8.0000  594.3996
+% 1.0000   40.0000    3.0000   40.0000    5.0000    2.0000    2.0000  713.9099
+% 1.0000   40.0000    1.0000   37.0000    8.0000    7.0000    7.0000  508.7363
+%% Check Result
+[J, Cost] = CostHybridResupply(x_opt, ParaCost, ParaInPlane, ParaParking);
+c = ConstHybridResupply(x_opt, ParaConst, ParaInPlane, ParaParking);
 
-%% Cost Function
-function J = CostFun(x, ParaCost, ParaInPlane, ParaParking)
-    %.. Set Design Variable
-    ParaInPlane.Q = x(1);
-    ParaInPlane.R = x(2);
-    ParaParking.Q = x(3);
-    ParaParking.R = x(4);
-    ParaParking.N_orbit = x(5);
-    ParaParking.alt = x(6);
-
-    %.. Compute RAAN Drift Period
-    [dt_plane, dt_park] = ComputeRaanPeriod(ParaInPlane, ParaParking);
-    ParaInPlane.dt_plane = dt_plane;
-    ParaParking.dt_park = dt_park;
-
-    %.. Analyze the performance
-    [PI_i, PI_p, T_i, T_p] = ExactInDirectProb(100, ParaInPlane, ParaParking);
-    
-    %.. Cost per unit time step for each different list
-    C_build = ComputeManufacturingCost(T_dr, T_ir, ParaCost, ParaInPlane, ParaParking);
-    C_hold = ComputeHoldingCost(P_Xi, P_Xp, ParaCost, ParaInPlane, ParaParking);
-    C_launch = ComputeLaunchCost(T_dr, T_ir, ParaCost, ParaInPlane, ParaParking);
-    C_transfer = ComputeOrbitTransferCost(P_Di, T_plane, ParaCost, ParaInPlane, ParaParking);
-    
-    %.. Total Cost
-    J = C_build + C_hold + C_launch + C_transfer;
-end
-
-%% Constraint Function
-function [c,ceq] = ConstFun(x, ParaConst, ParaInPlane, ParaParking)
-    %.. Set Design Variable
-    ParaInPlane.Q = x(1); % Qi
-    ParaInPlane.R = x(2); % Ri
-    ParaParking.Q = x(3); % Qp
-    ParaParking.R = x(4); % Rp
-    ParaParking.N_orbit = x(5); % N_park
-    ParaParking.alt = x(6); 
-
-    %.. Compute RAAN Drift Period
-    [dt_plane, dt_park] = ComputeRaanPeriod(ParaInPlane, ParaParking);
-    ParaInPlane.dt_plane = dt_plane;
-    ParaParking.dt_park = dt_park;
-
-    %.. Analyze the performance
-    [PI_i, PI_p, T_i, T_p] = ExactInDirectProb(100, ParaInPlane, ParaParking);
-
-    %.. p_loss < eps
-    xx_i = length(PI_i.pi_ir)-1:-1:0;
-    idx = find(xx_i < ParaInPlane.n_sat);
-    p_loss = sum(PI_i.pi_ir(idx));
-    c = p_loss - ParaConst.p_loss;
-    
-    %.. Rp + 1 <= Qp
-    if ParaParking.method == 0
-        c(2) = - ParaParking.Q + ParaParking.R + 1;
-    end
-    %.. Qi*Qp <= Q_max TODO
-    % c(3) = x(1) * x(3) - ParaCost.Q_max;
-    
-    %.. 0 < Rp < Qp_max (Handled by external feature)
-    %.. 
-
-    
-    
-    ceq = [];
-end
-
-%% Cost function
-function [C_build] = ComputeManufacturingCost(T_dr, T_ir, ParaCost, ParaInPlane, ParaParking)
-    % Input definition
-    c_build = ParaCost.c_build;
-    N_plane = ParaInPlane.N_plane;
-    N_park = ParaParking.N_park;
-    qi1 = ParaInPlane.Q1;
-    qi2 = ParaInPlane.Q2;
-    qp = ParaParking.Q;
-    
-    % Manufacturing Cost per unit time step
-    C_build = c_build*(N_plane/T_dr*qi2 + N_park/T_ir*qi1*qp);
-end
-
-function [C_hold] = ComputeHoldingCost(P_Xi, P_Xp, ParaCost, ParaInPlane, ParaParking)
-    % Input definition
-    c_hold = ParaCost.c_build;
-    N_plane = ParaInPlane.N_plane;
-    N_park = ParaParking.N_park;
-    N_sat = ParaInPlane.N_sat;
-    qi1 = ParaInPlane.Q1;
-    
-    % Avg. # of Spares
-    Si_k = (length(P_Xi)-1:-1:0) - N_sat; % (Xi_max, ... , 1, 0) - N_sat
-    Si_k(Si_k <= 0) = 0;
-    Si_avg = dot(Si_k,P_Xi);
-    
-    Xp_k = length(P_Xp)-1:-1:0; % Xp_max, ... , 1, 0
-    Xp_avg = dot(Xp_k,P_Xp);
-    
-    % Holding Cost per unit time step
-    C_hold = c_hold*(N_plane*Si_avg + N_park*qi1*Xp_avg);
-end
-
-function [C_launch] = ComputeLaunchCost(T_dr, T_ir, ParaCost, ParaInPlane, ParaParking)
-    % Input definition
-    c_launch_small_full = ParaCost.c_launch_small_full;
-    c_launch_small_part = ParaCost.c_launch_small_part;
-    c_launch_heavy_full = ParaCost.c_launch_heavy_full;
-    c_launch_heavy_part = ParaCost.c_launch_heavy_part;
-    N_plane = ParaInPlane.N_plane;
-    N_park = ParaParking.N_park;
-    qi1 = ParaInPlane.Q1;
-    qi2 = ParaInPlane.Q2;
-    qp = ParaParking.Q;
-    
-    % Apply minimum cost among full / partial cost
-    c_launch_small = min(c_launch_small_full, qi2*c_launch_small_part);
-    c_launch_heavy = min(c_launch_heavy_full, qi1*qp*c_launch_heavy_part);
-    
-    % Launch Cost per unit time step
-    C_launch = (N_plane/T_dr)*c_launch_small + (N_park/T_ir)*c_launch_heavy;
-end
-
-
-function [C_trn] = ComputeOrbitTransferCost(P_Di, T_plane, ParaCost, ParaInPlane, ParaParking)
-    % Input definition
-    h_park = ParaParking.h;
-    h_plane = ParaInPlane.h;
-    N_plane = ParaInPlane.N_plane;
-    m_sat = ParaInPlane.m_sat;
-    m_bus = ParaParking.m_bus;
-    Vex = ParaParking.Vex;
-    q1i = ParaInPlane.Q1;
-    c_fuel = ParaCost.c_fuel;
-    c_trn = ParaCost.c_trn;
-    
-    % Fuel for both (bus + spares) transfer
-    m_fuel = ComputeTransferFuelPerBatch(h_park, h_plane, m_bus, m_sat, q1i, Vex);
-    
-    % Avg. # of transfer for every review period (T_plane)
-    Di_k = 0:length(P_Di)-1; % 0,1,...,Dmax
-    Di_avg = dot(Di_k,P_Di);
-    
-    % Transfer cost per unit time step
-    C_trn = N_plane/T_plane * Di_avg * ( c_fuel*m_fuel + c_trn );
-end
-
-function [m_fuel] = ComputeTransferFuelPerBatch(h_park, h_plane, m_bus, m_sat, q1i, Vex)
-    global R_earth mu_earth
-    ai = R_earth + h_plane;
-    ap = R_earth + h_park;
-    DV = sqrt(mu_earth/ap)*( sqrt(2*ai/(ai+ap)) - 1 ) + sqrt(mu_earth/ai)*( 1 - sqrt(2*ap/(ai+ap)) );
-    m_fuel = (m_bus + q1i*m_sat)*( exp(DV/Vex) - 1 );
-end
-
-
-%% RAAN Period Computing Function
-function [dt_plane, dt_park] = ComputeRaanPeriod(ParaInPlane, ParaParking)
-    %.. Earth Parameters
-    global R_earth mu_earth J2_earth
-    
-    %.. In-Orbit Parameters
-    a_plane     =   R_earth + ParaInPlane.h;
-    e_plane     =   0;
-    i_plane     =   ParaInPlane.inc;
-    n_plane     =   sqrt(mu_earth/a_plane^3);
-    N_plane     =   ParaInPlane.N_orbit;
-    Wdot_orbit  =   -3/2 * J2_earth* n_plane * R_earth^2 / (a_plane*(1-e_plane))^2 * cos(i_plane);
-    
-    %.. Parking-Orbit Parameters
-    a_park      =   R_earth + ParaParking.h;
-    e_park      =   0;
-    i_park      =   ParaParking.inc;
-    n_park      =   sqrt(mu_earth/a_park^3);
-    N_park      =   ParaParking.N_orbit;
-    Wdot_park   =   -3/2 * J2_earth * n_park * R_earth^2 / (a_park*(1-e_park))^2 * cos(i_park);
-
-    %.. RAAN Drift period for in-plane and parking orbit
-    Wdrift      =   abs(Wdot_park - Wdot_orbit);
-    dt_plane    =   2*pi/ N_park / Wdrift / 24 / 3600; % RAAN Lead Time [day]
-    dt_park     =   2*pi/ N_plane / Wdrift / 24 / 3600; % RAAN Lead Time [day]
-end
+disp('External Function Results')
+disp(['Total Cost: ',num2str(J)])
+disp(['Build Cost: ',num2str(Cost.C_build)])
+disp(['Holding Cost: ',num2str(Cost.C_hold)])
+disp(['Launch Cost: ',num2str(Cost.C_launch)])
+disp(['Transfer Cost: ',num2str(Cost.C_transfer)])
+disp(['P(Xi< N_sat): ',num2str(c(1)+p_loss_plane)])
+disp(['P(Xp = 0): ',num2str(c(2)+p_loss_park)])

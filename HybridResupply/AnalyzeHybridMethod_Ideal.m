@@ -20,7 +20,7 @@ iter_max    =   2;
 
 %.. Sim time
 dt_sim      =   1;                      % [day]
-time_sim    =   0:dt_sim:365*1000;
+time_sim    =   0:dt_sim:365*50;
 
 %.. Constellation Parameters
 N_plane     =   40;                     % The number of orbital planes for constellation
@@ -409,7 +409,7 @@ ParaParking.dt_lv = dt_lv_park;
 ParaParking.mu_lv = mu_lv_park;
 ParaParking.method = 1;
 
-[PI_i, PI_p, T_i, T_p, err] = HybridProb(100, ParaInPlane, ParaParking);
+[PI_i, PI_p, T_i, T_p, err] = SolveHybridProb(100, ParaInPlane, ParaParking);
 
 pi_hr = mean(PI_i.pi_hr,2);
 xx_i = length(pi_hr)-1:-1:0;

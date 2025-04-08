@@ -13,14 +13,14 @@ addpath([libdir, 'CommonSource'])
 
 %% Test Param
 rng('default')
-iter_max = 5; % Number of different initial condition
+iter_max = 10; % Number of different initial condition
 
 %.. Sim time
 dt_sim = 1; % [day]
-time_sim = 0:dt_sim:365*100;
+time_sim = 0:dt_sim:365*10000;
 
 %.. Failure rate
-p_fail = 0.1/365; % [#/day] 0.05, 0.1, 0.15
+p_fail = 0.15/365; % [#/day] 0.05, 0.1, 0.15
 p_sim = p_fail * dt_sim; % [#/dt_sim]
 
 %.. Failure type
@@ -56,6 +56,8 @@ Xlv = zeros(dTlv_max, iter_max);
 
 %% Run Each Simulation
 for itr = 1:iter_max
+    disp(['Iter: ', num2str(itr)])
+    
     % The number of satellite at current time step
     Non_k = R+round(Q*rand);        
     
@@ -167,7 +169,7 @@ ParaInPlane.f_type = p_type;
 ParaInPlane.N_sat = N_sat;
 ParaInPlane.Q = Q;
 ParaInPlane.R = R;
-ParaInPlane.dt_mc = dt_sim/2;
+ParaInPlane.dt_mc = dt_sim;
 ParaInPlane.mu_lv = mu_LV;
 ParaInPlane.dt_lv = T0_LV;
 
@@ -181,19 +183,19 @@ end
 toc 
 
 figure(2); hold on
-plot(PI1.X, PI1.pi_dr, 'r*')
+plot(PI1.X, abs(PI1.pi_dr), 'r*')
 
 figure(3); hold on
-plot(PI1.X, PI1.pi_q, 'r*')
+plot(PI1.X, abs(PI1.pi_q), 'r*')
 
 figure(4); hold on
-plot(PI1.X, PI1.pi_r, 'r*')
+plot(PI1.X, abs(PI1.pi_r), 'r*')
 
 figure(5); hold on
-plot(PI1.X, PI1.pi_np, 'r*')
+plot(PI1.X, abs(PI1.pi_np), 'r*')
 
 figure(6); hold on
-plot(PI1.X, PI1.pi_wp, 'r*')
+plot(PI1.X, abs(PI1.pi_wp), 'r*')
 
 %.. Method 2
 disp('Ratio Based Method:')
@@ -205,23 +207,23 @@ end
 toc
 
 figure(2); hold on
-plot(PI2.X, PI2.pi_dr, 'go')
+plot(PI2.X, abs(PI2.pi_dr), 'go')
 legend('Sim.', 'Sol.1', 'Sol.2', 'location', 'best')
 
 figure(3); hold on
-plot(PI2.X, PI2.pi_q, 'go')
+plot(PI2.X, abs(PI2.pi_q), 'go')
 legend('Sim.', 'Sol.1', 'Sol.2', 'location', 'best')
 
 figure(4); hold on
-plot(PI2.X, PI2.pi_r, 'go')
+plot(PI2.X, abs(PI2.pi_r), 'go')
 legend('Sim.', 'Sol.1', 'Sol.2', 'location', 'best')
 
 figure(5); hold on
-plot(PI2.X, PI2.pi_np, 'go')
+plot(PI2.X, abs(PI2.pi_np), 'go')
 legend('Sim.', 'Sol.1', 'Sol.2', 'location', 'best')
 
 figure(6); hold on
-plot(PI2.X, PI2.pi_wp, 'go')
+plot(PI2.X, abs(PI2.pi_wp), 'go')
 legend('Sim.', 'Sol.1', 'Sol.2', 'location', 'best')
 
 % dtxx = T0_LV+1:dTlv_max;
@@ -235,6 +237,7 @@ c_hold = 0.5/365; % Holding cost per satellite in In-Plane orbit [M$/sat/day]
 c_lv_small_part = 3; %[M$/sat/launch] for direct LV (small size)
 c_lv_small_full = 7.5;%[M$/launch] for direct LV (small size)
 Qmax = 3;
+N_plane = 40;
 
 %.. Simulation Result
 Son = Non - N_sat;
@@ -242,44 +245,36 @@ Son(Son < 0) = 0;
 Navg = mean(mean(Non,1));
 Savg = mean(mean(Son,1));
 Nlv = sum(sum(Xlv,2));
-f_lv = Nlv/(iter_max*time_sim(end));
-f_sat = Q*Nlv/(iter_max*time_sim(end));
+f_lv = N_plane*Nlv/(iter_max*time_sim(end));
+f_sat = N_plane*Q*Nlv/(iter_max*time_sim(end));
 p_loss = sum(Xon(1:N_sat))/sum(Xon);
 
 disp(' ')
 disp('Simulation Results')
 disp(['Avg. # Sat: ',num2str(Navg)])
 disp(['Avg. # Spares: ',num2str(Savg)])
-disp(['Build Cost: ',num2str(c_build*f_sat)])
-disp(['Holding Cost: ',num2str(c_hold*Savg)])
-if Q == Qmax
-    disp(['Launch Cost: ',num2str(c_lv_small_full*f_lv)])
-else
-    disp(['Launch Cost: ',num2str(c_lv_small_part*Q*f_lv)])
-end
+disp(['# of bulit sat per unit time: ', num2str(f_sat)])
+disp(['# of LV per unit time: ', num2str(f_lv)])
 disp(['P(Xi< N_sat): ',num2str(p_loss)])
 
 %.. Analysis result
-n_avg = sum(PI2.X.*PI2.pi_dr);
-idx = find(PI2.X == N_sat);
-p_loss = sum(PI2.pi_dr(idx+1:end));
-n_spare = sum((PI2.X(1:idx-1)-N_sat).*PI2.pi_dr(1:idx-1));
+n_avg = sum(PI1.X.*PI1.pi_dr);
+idx = find(PI1.X == N_sat);
+p_loss = sum(PI1.pi_dr(idx+1:end));
+n_spare = sum((PI1.X(1:idx-1)-N_sat).*PI1.pi_dr(1:idx-1));
+f_lv = N_plane/T1.T_dr;
+f_sat = Q*N_plane/T1.T_dr;
 
 disp(' ')
 disp('Analysis Results')
 disp(['Avg. # Sat: ', num2str(n_avg)])
 disp(['Avg. # Spares: ',num2str(n_spare)])
-disp(['Build Cost: ',num2str(c_build*Q/T2.T_dr)])
-disp(['Holding Cost: ',num2str(c_hold*n_spare)])
-if Q == Qmax
-    disp(['Launch Cost: ',num2str(c_lv_small_full/T2.T_dr)])
-else
-    disp(['Launch Cost: ',num2str(c_lv_small_part*Q/T2.T_dr)])
-end
+disp(['# of bulit sat per unit time: ', num2str(f_sat)])
+disp(['# of LV per unit time: ', num2str(f_lv)])
 disp(['P(Xi< N_sat): ',num2str(p_loss)])
 
 %.. Using external function
-ParaInPlane.N_plane = 1;
+ParaInPlane.N_plane = N_plane;
 ParaCost.c_build = c_build;
 ParaCost.c_hold = c_hold;
 ParaCost.c_lv_small_part = c_lv_small_part;

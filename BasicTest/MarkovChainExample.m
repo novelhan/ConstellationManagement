@@ -51,6 +51,21 @@ pi_anl2 = limitdist(P); % Row vector form is used
 
 [pi_sim, pi_anl1, pi_anl2]
 
+% 
+time_step = 500;
+pi0 = [1; 0];
+pi_set = zeros(2,time_step);
+pi_set(:,1) = pi0;
+for i = 1:time_step-1
+    pi_set(:,i+1) = P*pi_set(:,i);
+end
+figure(1); hold on; grid on
+plot(1:time_step, pi_set(1,:),...
+     1:time_step, pi_set(2,:))
+xlabel('Time Step')
+ylabel('State Prob')
+legend('State 1', 'State 2')
+
 %% Test Large Matrix
 n = 500;
 P = rand(n,n);

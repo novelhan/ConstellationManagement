@@ -175,7 +175,7 @@ ylabel('Probability')
 
 %% Run Analysis Method
 %.. Marcov Chain Period
-dt_mc       =   dt_sim/2;                 % [day]
+dt_mc       =   dt_sim;                 % [day]
 
 %.. In-plane demand parameter (test)
 Eta = CustomPoisPdf(0:Xmax, p_drift);

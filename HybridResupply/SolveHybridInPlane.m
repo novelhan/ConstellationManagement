@@ -2,55 +2,53 @@
 % Compute Exact State Distrubution of InPlane Orbit Spares under Hybrid Resupply Method
 %
 % Input
-% ParaFail: Failure Related Input Strcture
+% Failure Related Input Strcture
 %   dt_mc: unit time step
 %   f_ref: failure rate per day (reference)
 %   f_type: failure type
 %   n_sat: # of nominal satellite
 %
-% ParaDirect: Direct Resupply Related Input Strcture
+% Direct Resupply Related Input Strcture
 %   mu: exponential mean time of lead time for direct resupply
 %   dt_lv: process time of lead time for direct resupply
 %   Q2: Reorder quantity for direct resupply
 %   R2: Reorder level for direct resupply
 %
-% ParaIndirect: Indirect Resupply Related Input Strcture
+% Indirect Resupply Related Input Strcture
 %   dt_plane: review period (duration unitl meet subsequent parking orbit)
 %   kappa: Parking orbit spare availability probability distribution
 %   Q1: Reorder quantity for indirect resupply
 %   R1: Reorder level for indirect resupply
 %
-% ParaDim: Dimension Reduction Related Input Strcture
-%   flag: flag to decide using dimension reduction (0:No reduction, 1: Apply reduction)
+% Dimension Reduction Related Input Strcture
+%   dim_flag: flag to decide using dimension reduction (0:No reduction, 1: Apply reduction)
 %   x_min: The number of state dimension to cut
 %   n_seg: The number of segments for approximating LV processing period
 %
 % Output
-% x: State vector of Markov Chain
 % PI: Set of Stationary State Distribution
 % T: Set of time duration for cycles
 %
 % Reference
 %
 
-function [x, PI, T] = HybridInPlane(ParaFail, ParaDirect, ParaIndirect, ParaDim)
+function [PI, T] = SolveHybridInPlane(kappa, ParaInPlane)
     %.. Failure Parameter
-    dt_mc = ParaFail.dt_mc;
-    f_mc = ParaFail.f_ref * dt_mc;
-    f_type = ParaFail.f_type;
-    n_sat = ParaFail.n_sat;
+    dt_mc = ParaInPlane.dt_mc;
+    f_mc = ParaInPlane.f_ref * dt_mc;
+    f_type = ParaInPlane.f_type;
+    n_sat = ParaInPlane.N_sat;
     
     %.. Direct Resupply Parameter
-    mu = ParaDirect.mu;
-    dt_lv = ParaDirect.dt_lv;
-    Q2 = ParaDirect.Q2;
-    R2 = ParaDirect.R2;
+    mu = ParaInPlane.mu;
+    dt_lv = ParaInPlane.dt_lv;
+    Q2 = ParaInPlane.Q2;
+    R2 = ParaInPlane.R2;
     
     %.. Indirect Resupply Parameter
-    dt_plane = ParaIndirect.dt_plane;
-    kappa = ParaIndirect.kappa;
-    Q1 = ParaIndirect.Q1;
-    R1 = ParaIndirect.R1;
+    dt_plane = ParaInPlane.dt_plane;
+    Q1 = ParaInPlane.Q1;
+    R1 = ParaInPlane.R1;
     
     %.. LV Param
     lam = 1/mu;
@@ -61,9 +59,11 @@ function [x, PI, T] = HybridInPlane(ParaFail, ParaDirect, ParaIndirect, ParaDim)
     c_plane = round(dt_plane/dt_mc);
     
     %.. Dimension Reduction Parameter
-    if ParaDim.flag == 1
-        x_min = max(ParaDim.x_min,0); % Minimum stock level
-        n_seg = max( min(ParaDim.n_seg,c_lv-1), 1); % 1 <= # of segment <= c_lv-1
+    if ParaInPlane.dim_flag == 1
+        x_min = min(R1,R2) - ceil((3*ParaInPlane.f_ref*n_sat)*(dt_lv + 2*mu));
+        n_seg = round( (dt_lv/dt_mc - 1)/3 );
+        x_min = max(x_min,0); % Minimum stock level
+        n_seg = max( min(n_seg,c_lv-1), 1); % 1 <= # of segment <= c_lv-1
     else
         x_min = 0;
         n_seg = c_lv-1;
@@ -258,9 +258,12 @@ function [x, PI, T] = HybridInPlane(ParaFail, ParaDirect, ParaIndirect, ParaDim)
     end
     
     %.. Output
+    PI.X = x;
+    
     PI.PI_hr = PI_hr;
     PI.pi_hr = pi_hr;
     
+    PI.pi_avg = mean(pi_hr,2);
     PI.pi_q1 = pi_q1;
     PI.pi_r1 = pi_r1;
     PI.pi_dmd = pi_dmd;

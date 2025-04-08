@@ -20,15 +20,17 @@ mu_earth = 3.986 * 10^5; % [km^3/sec^2]
 J2_earth = 0.00108263;
 
 %.. Selected Design Parameters: [Qi, Ri, Qp, Rp, Npark, hpakr]
-x = [4.0000   41.0000   10.0000    3.0000    3.0000  712.5999];
+% x = [4.0000   40.0000   10.0000    2.0000    4.0000  600];
+% x = [2.0000   41.0000   20.0000    2.0000    5.0000  555];
+x = [1.0000   40.0000    8.0000    7.0000    7.0000  500.7363];
 
 %% Test Param
 % rng('default')
-iter_max    =   1;
+iter_max    =   10;
 
 %.. Sim time
-dt_sim      =   1;                  % [day]
-time_sim    =   0:dt_sim:365*100;
+dt_sim      =   0.5;                  % [day]
+time_sim    =   0:dt_sim:365*10;
 
 %.. Conversion Parameters
 R2D = 180/pi;   % Radian to Degree
@@ -55,11 +57,11 @@ n_park      =   sqrt(mu_earth/a_park^3);
 Wdot_park   =   -3/2 * J2_earth * n_park * R_earth^2 / (a_park*(1-e_park))^2 * cos(i_park);
 
 Wdrift      =   abs(Wdot_park - Wdot_plane); % [rad/sec]
-Wdrift_dt   =   Wdrift * dt_sim * 24 * 3600; % [rad/dt]
+Wdrift_dt   =   Wdrift * 24 * 3600; % [rad/day]
 
 %.. In-Orbit/Parking Period
-dt_park     =   2*pi/ N_plane / Wdrift_dt; % Every Contact Period for Parking orbit [dt]
-dt_plane    =   2*pi/ N_park / Wdrift_dt; % Every Contact Period for In-Plane orbit [dt]
+dt_park     =   2*pi/ N_plane / Wdrift_dt; % Every Contact Period for Parking orbit [day]
+dt_plane    =   2*pi/ N_park / Wdrift_dt; % Every Contact Period for In-Plane orbit [day]
 
 %.. LV Lead Time
 mu_lv       =   60;
@@ -70,7 +72,7 @@ cnt_lv      =   round(dt_lv/dt_sim);
 %!! If failure rate >> resupply speed -> the method will give poor result
 p_fail      =   0.1/365;            % [#/day]
 p_sim       =   p_fail * dt_sim;    % [#/dt_sim]
-p_type      =   0; % 0 for const, 1 for state dependant
+p_type      =   1; % 0 for const, 1 for state dependant
 
 %.. In-Plane (Q,R) Policy Parameter
 Qi      =   x(1);
@@ -120,6 +122,8 @@ Xp_lv   =   zeros(N_park, iter_max);
 
 %% Run Each Simulation
 for itr = 1:iter_max
+    disp(['Iter: ', num2str(itr)])
+    
     % The number of satellite at current time step
     Ni_on_k   =   (Ri + round(Qi*rand(1,N_plane)));
     Np_on_k   =   kr+round(kq*rand(1,N_park));
@@ -128,7 +132,7 @@ for itr = 1:iter_max
     Wpark0      =   mod(2*pi*rand + 2*pi/N_park*(0:1:N_park-1)',2*pi);
     Wplane0     =   2*pi/N_plane*(0:1:N_plane-1)';
     v_park2plane=   zeros(N_park, length(time_sim));
-%     v_plane2park=   zeros(N_plane, length(time_sim)); % Needed only for simulator vaildation
+    v_plane2park=   zeros(N_plane, length(time_sim)); % Needed only for simulator vaildation
     for i = 1:N_park
         [min_angle, min_orbit] = min(mod(Wplane0 - Wpark0(i),2*pi));
         T0 = min_angle/Wdrift_dt;   % Time for first RAAN match
@@ -138,20 +142,20 @@ for itr = 1:iter_max
         for j = 1:length(Tidx)
             if time_sim(Tidx(j)) <= Tf
                 v_park2plane(i,Tidx(j)) = Oidx(j);
-%                 v_plane2park(Oidx(j),Tidx(j)) = i; 
+                v_plane2park(Oidx(j),Tidx(j)) = i; 
             end  
         end
     end
     
     % Needed only for simulator vaildation 
     if 0
-        disp(['Parking Orbit Period should be:' num2str(dt_park*dt_sim)])
+        disp(['Parking Orbit Period should be:' num2str(dt_park)])
         for i = 1:N_park
             disp(['Parking Orbit', num2str(i), ' is ', num2str(mean(diff(find(v_park2plane(1,:)' ~= 0)))*dt_sim)])
         end
 
         disp(' ')
-        disp(['In-Plane Orbit Period should be:' num2str(dt_plane*dt_sim)])
+        disp(['In-Plane Orbit Period should be:' num2str(dt_plane)])
         for i = 1:N_plane
             disp(['In-Plane Orbit', num2str(i), ' is ', num2str(mean(diff(find(v_plane2park(1,:)' ~= 0)))*dt_sim)])
         end
@@ -226,12 +230,11 @@ for itr = 1:iter_max
 
         %%% 4. Check Parking Reorder
         for j = 1:N_park
-%             LV must be available, RAAN Contact Moment, # of spares < kr 
-            if Lv_on(j) == -1 && v_park2plane(j,k) ~= 0 && Np_on_k(j) <= kr % Will save time (If we use Q >= R)
-%             if Lv_on(j) == -1 && Np_on_k(j) <= kr
+            % LV must be available, RAAN Contact Moment, # of spares < kr 
+            if Lv_on(j) == -1 && Np_on_k(j) <= kr
                 % Sample Lead Time and Save
-                t_Lv = dt_lv + CustomExpRnd(mu_lv,1);
-                Lv_on(j) = ceil( t_Lv/dt_sim );
+                t_lv = dt_lv + CustomExpRnd(mu_lv,1);
+                Lv_on(j) = ceil( t_lv/dt_sim );
                 
                 % Update Xp_lv
                 Xp_lv(j,itr) = Xp_lv(j,itr) + 1;
@@ -266,6 +269,8 @@ xxp_edge = -0.5:1:(Xp_max+0.5);
 dmd_edge = -0.5:1:(Di_max+0.5);
 Xi_on = sum(Xi_on, 3);
 Xp_on = sum(Xp_on, 3);
+Xi_q = sum(Xi_q,3);
+Xi_r = sum(Xi_r,3);
 Xp_q = sum(Xp_q,3);
 Xp_r = sum(Xp_r,3);
 Xi_dmd = sum(Xi_dmd,3);
@@ -297,6 +302,17 @@ for i = Ri-5:Xi_max
 end
 xlabel('Number of in-plane stock for entire period')
 ylabel('Probability')
+
+figure(32); hold on
+histogram('BinEdges', xxi_edge, 'BinCounts', sum(Xi_q,2),'Normalization','probability')
+xlabel('Number of in-plane stock right after replenishment')
+ylabel('Probability')
+
+figure(33); hold on
+histogram('BinEdges', xxi_edge, 'BinCounts', sum(Xi_r,2),'Normalization','probability')
+xlabel('Number of in-plane stock at the reorder moment')
+ylabel('Probability')
+
 
 figure(4); hold on
 histogram('BinEdges', xxp_edge, 'BinCounts', sum(Xp_on,2),'Normalization','probability')
@@ -333,7 +349,7 @@ ylabel('Probability')
 
 
 %% Run Analysis Method
-dt_mc = dt_sim/2;
+dt_mc = dt_sim;
 
 %.. InPlane Parameter
 ParaInPlane.Q = Qi;
@@ -362,25 +378,31 @@ tic
 toc
 
 figure(3); hold on
-plot(PI_i1.X, PI_i1.pi_avg, 'r*')
+plot(PI_i1.X, abs(PI_i1.pi_avg), 'r*')
+
+figure(32); hold on
+plot(PI_i1.X, abs(PI_i1.pi_q), 'r*')
+
+figure(33); hold on
+plot(PI_i1.X, abs(PI_i1.pi_r), 'r*')
 
 figure(4); hold on
-plot(PI_p1.X, PI_p1.pi_avg, 'r*')
+plot(PI_p1.X, abs(PI_p1.pi_avg), 'r*')
 
 figure(42); hold on
-plot(PI_p1.X, PI_p1.pi_q, 'r*')
+plot(PI_p1.X, abs(PI_p1.pi_q), 'r*')
 
 figure(43); hold on
-plot(PI_p1.X, PI_p1.pi_r, 'r*')
+plot(PI_p1.X, abs(PI_p1.pi_r), 'r*')
 
 figure(44); hold on
-plot(0:(length(PI_i1.pi_dmd)-1), PI_i1.pi_dmd, 'r*')
+plot(0:(length(PI_i1.pi_dmd)-1), abs(PI_i1.pi_dmd), 'r*')
 
 figure(31)
-plot(PI_i1.X, PI_i1.pi_avg, 'yo', 'MarkerFaceColor','y')
+plot(PI_i1.X, abs(PI_i1.pi_avg), 'yo', 'MarkerFaceColor','y')
 
 figure(41)
-plot(PI_p1.X, PI_p1.pi_avg, 'yo', 'MarkerFaceColor','y')
+plot(PI_p1.X, abs(PI_p1.pi_avg), 'yo', 'MarkerFaceColor','y')
 
 figure(5); hold on
 plot(1:length(err), log10(err), '-o')
@@ -398,27 +420,35 @@ tic
 toc
 
 figure(3); hold on
-plot(PI_i2.X, PI_i2.pi_avg, 'go')
+plot(PI_i2.X, abs(PI_i2.pi_avg), 'go')
+legend('Sim.', 'Sol.1', 'Sol.2', 'location', 'best')
+
+figure(32); hold on
+plot(PI_i2.X, abs(PI_i2.pi_q), 'go')
+legend('Sim.', 'Sol.1', 'Sol.2', 'location', 'best')
+
+figure(33); hold on
+plot(PI_i2.X, abs(PI_i2.pi_r), 'go')
 legend('Sim.', 'Sol.1', 'Sol.2', 'location', 'best')
 
 figure(4); hold on
-plot(PI_p2.X, PI_p2.pi_avg, 'go')
+plot(PI_p2.X, abs(PI_p2.pi_avg), 'go')
 legend('Sim.', 'Sol.1', 'Sol.2', 'location', 'best')
 
 figure(42); hold on
-plot(PI_p2.X, PI_p2.pi_q, 'go')
+plot(PI_p2.X, abs(PI_p2.pi_q), 'go')
 legend('Sim.', 'Sol.1', 'Sol.2', 'location', 'best')
 
 figure(43); hold on
-plot(PI_p2.X, PI_p2.pi_r, 'go')
+plot(PI_p2.X, abs(PI_p2.pi_r), 'go')
 legend('Sim.', 'Sol.1', 'Sol.2', 'location', 'best')
 
 figure(44); hold on
-plot(0:(length(PI_i2.pi_dmd)-1), PI_i2.pi_dmd, 'go')
+plot(0:(length(PI_i2.pi_dmd)-1), abs(PI_i2.pi_dmd), 'go')
 legend('Sim.', 'Sol.1', 'Sol.2', 'location', 'best')
 
 figure(31)
-plot(PI_i2.X, PI_i2.pi_avg, 'gx', 'MarkerFaceColor','y')
+plot(PI_i2.X, abs(PI_i2.pi_avg), 'gx', 'MarkerFaceColor','y')
 h = zeros(4, 1);
 h(1) = plot(nan,'k*');
 h(2) = plot(nan,'ro', 'MarkerFaceColor','r');
@@ -444,8 +474,8 @@ legend('Sol.1', 'Sol.2', 'location', 'best')
 
 %% Additional Cost Validation
 c_build = 0.5; %[$/sat]
-c_hold_plane = 0.5/365; %[$/sat/day]
-c_hold_park = 0.5/365; %[$/sat/day]
+c_hold_plane = 5/365; %[$/sat/day]
+c_hold_park = 5/365; %[$/sat/day]
 c_lv_heavy_part = 2; %[$/sat/launch]
 c_lv_heavy_full = 67; %[%/launch]
 c_transfer = 0.5; % Risk and additional cost for indirect transfer [M$/batch]

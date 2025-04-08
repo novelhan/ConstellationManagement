@@ -255,11 +255,11 @@ ParaIndirect.R1 = R1;
 ParaDim.flag = 0;
 tic
 for i = 1:20
-[x, PI, T] = HybridInPlane(ParaFail, ParaDirect, ParaIndirect, ParaDim);
+[PI, T] = SolveHybridInPlane(ParaFail, ParaDirect, ParaIndirect, ParaDim);
 end
 toc
 disp(['Full Result: ', num2str(T.T_q1/T.T_q2)])
-
+x = PI.X;
 s = 'r*';
 figure(2); hold on
 plot(x, mean(PI.pi_hr,2), s)
@@ -307,10 +307,11 @@ ParaDim.x_min = min(R1,R2) - ceil((2.5*p_sim*n_sat)*(dt_LV + 1.5*mu_LV)); % 2 si
 ParaDim.n_seg = round( (dt_LV/dt_mc - 1)/3 );
 tic
 for i = 1:20
-[x, PI, T] = HybridInPlane(ParaFail, ParaDirect, ParaIndirect, ParaDim);
+[PI, T] = HybridInPlane(ParaFail, ParaDirect, ParaIndirect, ParaDim);
 end
 toc
 disp(['Reduced Result: ', num2str(T.T_q1/T.T_q2)])
+x = PI.X;
 s = 'mx';
 figure(2); hold on
 plot(x, mean(PI.pi_hr,2), s)

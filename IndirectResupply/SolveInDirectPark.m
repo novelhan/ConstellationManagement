@@ -56,7 +56,7 @@ function [PI, T] = SolveInDirectPark(Eta, ParaParking)
         Eta = eta(1:nx);
         Eta(end) = Eta(end) + sum(eta(nx+1:end));
     end
-    Eta = Eta/sum(Eta);
+    Eta = Eta;
 
     I = eye(nx);
     Pf = zeros(nx);
@@ -217,9 +217,10 @@ function [PI, T] = SolveInDirectPark(Eta, ParaParking)
             pi_wp(:,i) = PI_full(nx+1:2*nx,i);
             pi_tp(:,i) = sum(reshape(PI_full(2*nx+1:end,i),nx,[]),2);
         end
-        a_np = sum(mean(pi_np,2));
-        a_wp = sum(mean(pi_wp,2));
-        a_tp = sum(mean(pi_tp,2))/(k_lv-1)*k_lv; % Only k_lv - 1 terms are considered for the states
+        a_np = sum(sum(pi_np,2));
+        a_wp = sum(sum(pi_wp,2));
+        a_tp = sum(sum(pi_tp,2))/(k_lv-1)*k_lv; % Only k_lv - 1 terms are considered for the states
+%         a_tp = sum(sum(pi_tp,2)); % Modifiy the state to use this code line
 
         %.. Avg. Dist.
         pi_ir = mean(pi_full,2);
@@ -248,8 +249,8 @@ function [PI, T] = SolveInDirectPark(Eta, ParaParking)
         pi_r = sum(pi_r,2)/sum(sum(pi_r,2));
 
         % Normalization
-        pi_np = sum(pi_np,2)/sum(sum(pi_np,2));
-        pi_wp = sum(pi_wp+pi_tp,2)/sum(sum(pi_wp+pi_tp,2));
+        pi_np = sum(pi_np,2)/a_np;
+        pi_wp = sum(pi_wp+pi_tp,2)/(a_wp + a_tp);
         
         %.. Compuite Avg. period of each conditional distribution.
         T_tp = k_lv*dt_mc;

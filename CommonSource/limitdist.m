@@ -2,7 +2,7 @@ function p = limitdist(P,method)
 
 %.. Select computation method
 if nargin == 1
-    method = 2;
+    method = 1;
 end
     
 if method == 3
@@ -50,8 +50,8 @@ else
     % Rmk: Based on the several test, this approach shows the best computational speed, especially
     % for large matrix
     [n, ~] = size(P);
-%     pk = [1; zeros(n-1,1)];
-    pk = ones(n,1)/n;
+    pk = [1; zeros(n-1,1)];
+%     pk = ones(n,1)/n;
     for itr = 1:1000
         pkk = P*pk;
         pkk = pkk/sum(pkk);
