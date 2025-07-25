@@ -15,5 +15,8 @@ Statistics and Machine Learning Toolbox™ is needed for some basic validation s
 
 The main scripts do not require the toolbox.
 
+## Acknowledgments
+This research was supported by the Advanced Technology R&D Center at Mitsubishi Electric Corporation.
+
 ## License
 This project is licensed under the MIT License – see the [LICENSE](./LICENSE) file for details
