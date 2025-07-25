@@ -20,7 +20,7 @@
 % Analysis and Design of Satellite Constellation Spare Strategy Using Markov Chain
 % https://doi.org/10.48550/arXiv.2408.09250
 
-function [x, PI, T] = ExactDirectProb(f, f_type, Q, R, mu, dt_mc, dt_lv, n_sat)
+function [x, PI, T] = ExactDirectEventBased(f, f_type, Q, R, mu, dt_mc, dt_lv, n_sat)
     %%% Step 1: Initialize the parameters
     %.. State
     xmax = Q + R; % Max State Level: bar(N_sat), p7
@@ -37,13 +37,13 @@ function [x, PI, T] = ExactDirectProb(f, f_type, Q, R, mu, dt_mc, dt_lv, n_sat)
     Pf = zeros(nx); % Dim: (bar(N_sat)+1) x (bar(N_sat) + 1)
     for i = 1:nx
         if f_type == 0 % Constant Failure Rate
-            Pf(i:end,i) = poisspdf(0:nx-i, n_sat*f)';
+            Pf(i:end,i) = CustomPoisPdf(0:nx-i, n_sat*f)';
 
         else % Stock Level Dependant Failure Rate
             if (nx-i) > n_sat
-                Pf(i:end,i) = poisspdf(0:nx-i, n_sat*f)';        
+                Pf(i:end,i) = CustomPoisPdf(0:nx-i, n_sat*f)';        
             else
-                Pf(i:end,i) = poisspdf(0:nx-i, (nx-i)*f)';  
+                Pf(i:end,i) = CustomPoisPdf(0:nx-i, (nx-i)*f)';  
             end
         end
         Pf(end,i) = 1 - sum(Pf(1:end-1, i));
@@ -73,7 +73,7 @@ function [x, PI, T] = ExactDirectProb(f, f_type, Q, R, mu, dt_mc, dt_lv, n_sat)
     Pqq = Pqr*Prq; % Eq.22
 
     %.. Conditional Dist.
-    pi_q = limitdist(Pqq'); % Prob. Dist after reorder arrives
+    pi_q = limitdist(Pqq); % Prob. Dist after reorder arrives
     pi_r = Prq*pi_q; % Prob. Dist when reorder is made
 
     %%% Step 3: Compute pi_np and pi_wp
@@ -106,37 +106,4 @@ function [x, PI, T] = ExactDirectProb(f, f_type, Q, R, mu, dt_mc, dt_lv, n_sat)
     T.T_dr = T_dr*dt_mc; % Eq.24 in unit of [day]
     T.T_wp = T_wp*dt_mc; % Eq.26
     T.T_np = T_np*dt_mc; % Eq.29
-end
-
-function p = limitdist(P)
-%Obtain the stationary probability distribution
-%vector p of an irreducible, recurrent Markov
-%chain by state reduction. P is the transition
-%probabilities matrix of a discrete-time Markov
-%chain or the generator matrix Q.
-% https://www.math.wustl.edu/~feres/Math450Lect04.pdf
-
-[ns, ~]=size(P);
-n=ns;
-p=zeros(n);
-while n>1
-    n1=n-1;
-    s=sum(P(n,1:n1));
-    P(1:n1,n)=P(1:n1,n)/s;
-    n2=n1;
-    while n2>0
-        P(1:n1,n2)=P(1:n1,n2)+P(1:n1,n)*P(n,n2);
-        n2=n2-1;
-    end
-    n=n-1;
-end
-%backtracking
-p(1)=1;
-j=2;
-while j<=ns
-    j1=j-1;
-    p(j)=sum(p(1:j1).*(P(1:j1,j))');
-    j=j+1;
-end
-p=p/(sum(p));
 end

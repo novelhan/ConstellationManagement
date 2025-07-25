@@ -4,6 +4,12 @@ close all
 clear all
 clc
 
+%.. PATH
+mfilepath = pwd;
+idcs = strfind(mfilepath,'\');
+libdir = mfilepath(1:idcs(end));
+addpath([libdir, 'CommonSource'])
+
 state = 0; % 0: hot, 1: cold
 iter_max = 1000; % # of iteration
 Xset = zeros(iter_max,1); % Var. for saving
@@ -41,39 +47,26 @@ pi_anl1 = V(:,2)/sum(V(:,2));
 
 % Long term behavior: state space reduction
 P100 = P^100;
-pi_anl2 = limitdist(P'); % Row vector form is used
+pi_anl2 = limitdist(P); % Row vector form is used
 
 [pi_sim, pi_anl1, pi_anl2]
 
-function p = limitdist(P)
-%Obtain the stationary probability distribution
-%vector p of an irreducible, recurrent Markov
-%chain by state reduction. P is the transition
-%probabilities matrix of a discrete-time Markov
-%chain or the generator matrix Q.
-% https://www.math.wustl.edu/~feres/Math450Lect04.pdf
+%% Test Large Matrix
+n = 50;
+P = rand(n,n);
+for i = 1:n
+    P(:,i) = P(:,i)/sum(P(:,i));
+end
 
-[ns, ~]=size(P);
-n=ns;
-p=zeros(n);
-while n>1
-    n1=n-1;
-    s=sum(P(n,1:n1));
-    P(1:n1,n)=P(1:n1,n)/s;
-    n2=n1;
-    while n2>0
-        P(1:n1,n2)=P(1:n1,n2)+P(1:n1,n)*P(n,n2);
-        n2=n2-1;
-    end
-    n=n-1;
+iter_max = 100;
+tic
+for i = 1:iter_max
+    x0 = limitdist(P,2); % State-space reduction method
 end
-%backtracking
-p(1)=1;
-j=2;
-while j<=ns
-    j1=j-1;
-    p(j)=sum(p(1:j1).*(P(1:j1,j))');
-    j=j+1;
+T0 = toc
+
+tic
+for i = 1:iter_max
+    x1 = limitdist(P); % Built-in linear solver
 end
-p=p/(sum(p));
-end
+T1 = toc
